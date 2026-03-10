@@ -1,0 +1,498 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Facility & Auth ───
+
+model Facility {
+  id              String   @id @default(cuid())
+  name            String
+  address         String?
+  timeZone        String   @default("America/New_York")
+  operatingHours  Json?    // { mon: { open: "06:00", close: "23:00" }, ... }
+  seasonalMonths  Json?    // { open: [9,10,11,12,1,2,3,4], closed: [5,6,7,8] }
+  logoUrl         String?
+  darkMode        Boolean  @default(false)
+  dataRetentionYears    Int @default(3)
+  incidentRetentionYears Int @default(7)
+  archived        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users           User[]
+  rinks           Rink[]
+  machines        Machine[]
+  equipment       Equipment[]
+  dailyReportTabs DailyReportTab[]
+  shiftTypes      ShiftType[]
+  incidentLocations IncidentLocation[]
+  airQualityMetrics AirQualityMetric[]
+  moduleSettings  ModuleSetting[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String
+  role          Role     @default(STAFF)
+  facilityId    String
+  facility      Facility @relation(fields: [facilityId], references: [id])
+  active        Boolean  @default(true)
+  lastActive    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  checklistEntries  ChecklistEntry[]
+  iceDepthReadings  IceDepthReading[]
+  iceMakes          IceMake[]
+  bladeChanges      BladeChange[]
+  edgingLogs        EdgingLog[]
+  circleChecks      CircleCheck[]
+  incidents         Incident[]
+  refrigerationLogs RefrigerationLog[]
+  airQualityLogs    AirQualityLog[]
+  shiftsAssigned    Shift[]          @relation("AssignedShifts")
+  availabilities    Availability[]
+  swapRequests      ShiftSwap[]      @relation("SwapRequester")
+  swapTargets       ShiftSwap[]      @relation("SwapTarget")
+  swapApprovals     ShiftSwap[]      @relation("SwapApprover")
+  notifications     Notification[]
+}
+
+enum Role {
+  SUPER_ADMIN
+  FACILITY_ADMIN
+  MANAGER
+  SUPERVISOR
+  STAFF
+  READ_ONLY
+}
+
+// ─── Rink Configuration ───
+
+model Rink {
+  id          String   @id @default(cuid())
+  facilityId  String
+  facility    Facility @relation(fields: [facilityId], references: [id])
+  name        String   // "Rink A", "Main Rink", etc.
+  widthFt     Float    @default(85)
+  lengthFt    Float    @default(200)
+  logoUrl     String?  // Center ice logo
+  createdAt   DateTime @default(now())
+
+  measurementPoints IceDepthPoint[]
+  iceDepthReadings  IceDepthReading[]
+  iceMakes          IceMake[]
+  edgingLogs        EdgingLog[]
+
+  // Ice depth thresholds (inches)
+  greenMin    Float @default(1.00)
+  greenMax    Float @default(1.74)
+  yellowMin   Float @default(1.75)
+  yellowMax   Float @default(3.50)
+  redMin      Float @default(0.00)
+  redMax      Float @default(0.99)
+}
+
+model IceDepthPoint {
+  id        String @id @default(cuid())
+  rinkId    String
+  rink      Rink   @relation(fields: [rinkId], references: [id])
+  number    Int    // Sequential point number
+  xPercent  Float  // X position as percentage of diagram width
+  yPercent  Float  // Y position as percentage of diagram height
+  createdAt DateTime @default(now())
+
+  readings  IceDepthReading[]
+}
+
+// ─── Machines & Equipment ───
+
+model Machine {
+  id          String   @id @default(cuid())
+  facilityId  String
+  facility    Facility @relation(fields: [facilityId], references: [id])
+  name        String   // "Zamboni #1"
+  fuelType    FuelType @default(GAS)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  iceMakes      IceMake[]
+  bladeChanges  BladeChange[]
+  circleChecks  CircleCheck[]
+  circleCheckItems CircleCheckItem[]
+}
+
+enum FuelType {
+  GAS
+  ELECTRIC
+}
+
+model Equipment {
+  id          String   @id @default(cuid())
+  facilityId  String
+  facility    Facility @relation(fields: [facilityId], references: [id])
+  name        String   // "Compressor #1 - Rink A"
+  type        String   // "compressor", "pump", "condenser"
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  readingTypes      EquipmentReadingType[]
+  refrigerationLogs RefrigerationLog[]
+}
+
+model EquipmentReadingType {
+  id          String    @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  name        String    // "Head Pressure"
+  unit        String    // "PSI"
+  minThreshold Float?
+  maxThreshold Float?
+  createdAt   DateTime  @default(now())
+
+  readings    RefrigerationReading[]
+}
+
+// ─── Daily Reports ───
+
+model DailyReportTab {
+  id          String   @id @default(cuid())
+  facilityId  String
+  facility    Facility @relation(fields: [facilityId], references: [id])
+  name        String   // "Front Desk", "Zamboni Log", etc.
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  checklistItems ChecklistItem[]
+}
+
+model ChecklistItem {
+  id            String         @id @default(cuid())
+  tabId         String
+  tab           DailyReportTab @relation(fields: [tabId], references: [id])
+  text          String
+  checklistType ChecklistType
+  sortOrder     Int            @default(0)
+  recurrence    Recurrence     @default(DAILY)
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+
+  entries       ChecklistEntry[]
+}
+
+enum ChecklistType {
+  OPENING
+  CLOSING
+  DAILY_OPS
+}
+
+enum Recurrence {
+  DAILY
+  WEEKLY
+  MONTHLY
+  SEASONAL
+}
+
+model ChecklistEntry {
+  id              String        @id @default(cuid())
+  checklistItemId String
+  checklistItem   ChecklistItem @relation(fields: [checklistItemId], references: [id])
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  checked         Boolean       @default(true)
+  date            DateTime      @db.Date
+  checkedAt       DateTime      @default(now())
+  notes           String?
+}
+
+// ─── Ice Depth Readings ───
+
+model IceDepthReading {
+  id        String        @id @default(cuid())
+  pointId   String
+  point     IceDepthPoint @relation(fields: [pointId], references: [id])
+  rinkId    String
+  rink      Rink          @relation(fields: [rinkId], references: [id])
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  value     Float         // Measurement in inches
+  source    String        @default("manual") // "manual" or "bluetooth"
+  createdAt DateTime      @default(now())
+}
+
+// ─── Ice Operations ───
+
+model IceMake {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  rinkId       String
+  rink         Rink     @relation(fields: [rinkId], references: [id])
+  machineId    String
+  machine      Machine  @relation(fields: [machineId], references: [id])
+  machineHours Float?
+  iceTaken     Float?   // inches shaved
+  waterUsed    Float?   // gallons
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+model BladeChange {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  machineId String
+  machine   Machine  @relation(fields: [machineId], references: [id])
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model EdgingLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  rinkId    String
+  rink      Rink     @relation(fields: [rinkId], references: [id])
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model CircleCheckItem {
+  id        String  @id @default(cuid())
+  machineId String
+  machine   Machine @relation(fields: [machineId], references: [id])
+  text      String
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  responses CircleCheckResponse[]
+}
+
+model CircleCheck {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  machineId String
+  machine   Machine  @relation(fields: [machineId], references: [id])
+  createdAt DateTime @default(now())
+
+  responses CircleCheckResponse[]
+}
+
+model CircleCheckResponse {
+  id            String         @id @default(cuid())
+  circleCheckId String
+  circleCheck   CircleCheck    @relation(fields: [circleCheckId], references: [id])
+  itemId        String
+  item          CircleCheckItem @relation(fields: [itemId], references: [id])
+  passed        Boolean
+  notes         String?        // Required if !passed
+}
+
+// ─── Employee Scheduling ───
+
+model ShiftType {
+  id         String   @id @default(cuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  name       String   // "Zamboni Operator", "Front Desk", etc.
+  color      String   @default("#002244") // Hex color for calendar
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  shifts     Shift[]
+}
+
+model Shift {
+  id          String    @id @default(cuid())
+  shiftTypeId String
+  shiftType   ShiftType @relation(fields: [shiftTypeId], references: [id])
+  assignedToId String?
+  assignedTo   User?    @relation("AssignedShifts", fields: [assignedToId], references: [id])
+  date        DateTime  @db.Date
+  startTime   String    // "08:00"
+  endTime     String    // "16:00"
+  isOpen      Boolean   @default(false) // Open shift (unassigned, broadcasted)
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  swaps       ShiftSwap[]
+}
+
+model Availability {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime @db.Date
+  startTime String   // "08:00"
+  endTime   String   // "16:00"
+  recurring Boolean  @default(false)
+  dayOfWeek Int?     // 0=Sun, 6=Sat (for recurring)
+  createdAt DateTime @default(now())
+}
+
+model ShiftSwap {
+  id            String     @id @default(cuid())
+  shiftId       String
+  shift         Shift      @relation(fields: [shiftId], references: [id])
+  requesterId   String
+  requester     User       @relation("SwapRequester", fields: [requesterId], references: [id])
+  targetId      String
+  target        User       @relation("SwapTarget", fields: [targetId], references: [id])
+  status        SwapStatus @default(PENDING)
+  approvedById  String?
+  approvedBy    User?      @relation("SwapApprover", fields: [approvedById], references: [id])
+  note          String?
+  createdAt     DateTime   @default(now())
+  resolvedAt    DateTime?
+}
+
+enum SwapStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+// ─── Incident Reporting ───
+
+model Incident {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  type            IncidentType
+  dateTime        DateTime
+  locationId      String?
+  location        IncidentLocation? @relation(fields: [locationId], references: [id])
+  locationText    String?      // Free text if not using dropdown
+  description     String
+  injuredName     String?
+  injuredType     InjuredType?
+  bodyDiagramData Json?        // Array of marked body regions
+  witnesses       String?
+  createdAt       DateTime     @default(now())
+}
+
+enum IncidentType {
+  INCIDENT
+  ACCIDENT
+}
+
+enum InjuredType {
+  PATRON
+  STAFF
+}
+
+model IncidentLocation {
+  id         String   @id @default(cuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  name       String
+  active     Boolean  @default(true)
+
+  incidents  Incident[]
+}
+
+// ─── Refrigeration Plant ───
+
+model RefrigerationLog {
+  id          String    @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  readings    RefrigerationReading[]
+}
+
+model RefrigerationReading {
+  id              String               @id @default(cuid())
+  logId           String
+  log             RefrigerationLog     @relation(fields: [logId], references: [id])
+  readingTypeId   String
+  readingType     EquipmentReadingType @relation(fields: [readingTypeId], references: [id])
+  value           Float
+  outOfRange      Boolean              @default(false)
+}
+
+// ─── Air Quality ───
+
+model AirQualityMetric {
+  id           String   @id @default(cuid())
+  facilityId   String
+  facility     Facility @relation(fields: [facilityId], references: [id])
+  name         String   // "Carbon Monoxide (CO)"
+  unit         String   // "PPM"
+  minThreshold Float?
+  maxThreshold Float?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  readings     AirQualityReading[]
+}
+
+model AirQualityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  location  String   // "Ice Level", "Stands", etc.
+  notes     String?
+  createdAt DateTime @default(now())
+
+  readings  AirQualityReading[]
+}
+
+model AirQualityReading {
+  id        String           @id @default(cuid())
+  logId     String
+  log       AirQualityLog    @relation(fields: [logId], references: [id])
+  metricId  String
+  metric    AirQualityMetric @relation(fields: [metricId], references: [id])
+  value     Float
+  outOfRange Boolean         @default(false)
+}
+
+// ─── Notifications ───
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  data      Json?            // Additional context
+  createdAt DateTime         @default(now())
+}
+
+enum NotificationType {
+  OUT_OF_RANGE
+  INCIDENT_SUBMITTED
+  SHIFT_REMINDER
+  SHIFT_SWAP_REQUEST
+  SHIFT_SWAP_RESOLVED
+  OPEN_SHIFT
+}
+
+// ─── Module Settings ───
+
+model ModuleSetting {
+  id         String   @id @default(cuid())
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+  module     String   // "daily_reports", "ice_depth", etc.
+  enabled    Boolean  @default(true)
+  roleAccess Json?    // { "STAFF": true, "SUPERVISOR": true, ... }
+  createdAt  DateTime @default(now())
+
+  @@unique([facilityId, module])
+}
