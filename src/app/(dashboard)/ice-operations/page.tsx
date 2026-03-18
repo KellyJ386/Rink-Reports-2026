@@ -8,10 +8,10 @@ import { Select } from '@/components/ui/Select'
 import { Checkbox } from '@/components/ui/Checkbox'
 import clsx from 'clsx'
 
-type Tab = 'ice-makes' | 'blade-change' | 'edging' | 'circle-check'
+type Tab = 'ice-cut' | 'blade-change' | 'edging' | 'circle-check'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'ice-makes', label: 'Ice Makes' },
+  { id: 'ice-cut', label: 'Ice Cut' },
   { id: 'blade-change', label: 'Blade Change' },
   { id: 'edging', label: 'Edging' },
   { id: 'circle-check', label: 'Circle Check' },
@@ -37,7 +37,7 @@ const CIRCLE_CHECK_ITEMS = [
 ]
 
 export default function IceOperationsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('ice-makes')
+  const [activeTab, setActiveTab] = useState<Tab>('ice-cut')
   const [circleCheckResults, setCircleCheckResults] = useState<Record<number, { passed: boolean; notes: string }>>(
     Object.fromEntries(CIRCLE_CHECK_ITEMS.map((_, i) => [i, { passed: true, notes: '' }]))
   )
@@ -81,8 +81,8 @@ export default function IceOperationsPage() {
       </div>
 
       <div className="px-4">
-        {/* Ice Makes Form */}
-        {activeTab === 'ice-makes' && (
+        {/* Ice Cuts Form */}
+        {activeTab === 'ice-cut' && (
           <form onSubmit={handleSubmit} className="card space-y-4 max-w-2xl">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Date & Time" type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} />
@@ -97,7 +97,7 @@ export default function IceOperationsPage() {
               <label className="form-label">Notes (optional)</label>
               <textarea className="form-input min-h-[80px]" placeholder="Add any notes..." />
             </div>
-            <Button type="submit" size="lg">Save Ice Make</Button>
+            <Button type="submit" size="lg">Save Ice Cut</Button>
           </form>
         )}
 

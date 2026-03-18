@@ -1,5 +1,7 @@
 import { ModuleConfig } from '@/types'
 
+// ─── Module Configuration ────────────────────────────────────────────────────
+
 export const MODULES: ModuleConfig[] = [
   {
     id: 'daily-reports',
@@ -58,14 +60,35 @@ export const MODULES: ModuleConfig[] = [
     color: 'bg-gray-700',
     adminOnly: true,
   },
-  {
-    id: 'communication',
-    name: 'Communication',
-    icon: 'message-square',
-    href: '/communication',
-    color: 'bg-indigo-700',
-  },
 ]
+
+// ─── Ice Operations Sub-Tabs ─────────────────────────────────────────────────
+
+export const ICE_OPERATIONS_TABS = [
+  { id: 'ice-cut', label: 'Ice Cut' },
+  { id: 'edging', label: 'Edging' },
+  { id: 'circle-check', label: 'Circle Check' },
+  { id: 'blade-change', label: 'Blade Change' },
+] as const
+
+// ─── Role Hierarchy ──────────────────────────────────────────────────────────
+// Higher index = higher privilege. Used for permission checking.
+
+export const ROLE_HIERARCHY = [
+  'read_only',
+  'staff',
+  'supervisor',
+  'manager',
+  'facility_admin',
+  'super_admin',
+] as const
+
+// ─── Module Limits ───────────────────────────────────────────────────────────
+
+export const MAX_DAILY_REPORT_TABS = 15
+export const MAX_ICE_DEPTH_TEMPLATES = 8
+
+// ─── Body Diagram Regions (Incident Reporting) ──────────────────────────────
 
 export const BODY_REGIONS_FRONT = [
   { id: 'head_front', label: 'Head', x: 50, y: 5, w: 12, h: 8 },
@@ -105,8 +128,30 @@ export const BODY_REGIONS_BACK = [
   { id: 'lower_back', label: 'Lower Back', x: 50, y: 38, w: 20, h: 10 },
 ] as const
 
+// ─── Ice Depth Color Thresholds ──────────────────────────────────────────────
+// Portrait orientation preferred on mobile for Ice Depth module
+
 export const ICE_DEPTH_COLORS = {
   green: { min: 1.0, max: 1.74, color: '#69BE28', label: 'Optimal' },
   yellow: { min: 1.75, max: 3.5, color: '#FFB800', label: 'Too Thick' },
   red: { min: 0, max: 0.99, color: '#D32F2F', label: 'Too Thin' },
 } as const
+
+// ─── Brand Colors ────────────────────────────────────────────────────────────
+
+export const BRAND_COLORS = {
+  navy: '#002244',
+  actionGreen: '#69BE28',
+  wolfGrey: '#A5ACAF',
+  alertYellow: '#FFB800',
+  alertRed: '#D32F2F',
+  darkBg: '#001122',
+} as const
+
+// ─── Tennity Pilot Defaults ──────────────────────────────────────────────────
+
+export const DEFAULT_CERTIFICATIONS = [
+  'Zamboni Operator',
+  'First Aid / CPR',
+  'AED',
+] as const

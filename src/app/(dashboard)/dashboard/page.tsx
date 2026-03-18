@@ -4,15 +4,16 @@ import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
 import { AlertBadge } from '@/components/ui/AlertBadge'
 import { MODULES } from '@/lib/constants'
-
-// Mock alert counts - would come from API
-const alertCounts: Record<string, number> = {
-  refrigeration: 2,
-  incidents: 1,
-  'air-quality': 0,
-}
+import { useAuth } from '@/hooks/useAuth'
 
 export default function DashboardPage() {
+  const { canAccess } = useAuth()
+
+  const visibleModules = MODULES.filter((mod) => canAccess(mod.id))
+
+  // Alert counts will be wired to live data in Phase 3
+  const alertCounts: Record<string, number> = {}
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-navy dark:text-white mb-6">
@@ -20,7 +21,7 @@ export default function DashboardPage() {
       </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {MODULES.map((mod) => (
+        {visibleModules.map((mod) => (
           <Link
             key={mod.id}
             href={mod.href}

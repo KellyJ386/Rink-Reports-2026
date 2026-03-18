@@ -55,7 +55,6 @@ const MODULE_TOGGLES = [
   { id: 'incidents', name: 'Incident Reporting', enabled: true },
   { id: 'refrigeration', name: 'Refrigeration Plant', enabled: true },
   { id: 'air-quality', name: 'Air Quality', enabled: false },
-  { id: 'communication', name: 'Communication', enabled: false },
 ]
 
 export default function AdminPage() {

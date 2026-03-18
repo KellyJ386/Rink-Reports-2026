@@ -1,16 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
 
-export default function LoginPage() {
+export default function OnboardingAccountPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [rememberMe, setRememberMe] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -18,27 +17,40 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+
     setLoading(true)
 
     try {
       const supabase = createClient()
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signUp({
         email,
         password,
       })
 
       if (authError) {
-        setError(authError.message || 'Invalid credentials')
+        setError(authError.message)
         return
       }
 
-      router.push('/dashboard')
+      router.push('/onboarding/facility')
     } catch {
-      setError('Unable to connect. Please try again.')
+      setError('Unable to create account. Please try again.')
     } finally {
       setLoading(false)
     }
   }
+
+  const currentStep = 1
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-navy-dark px-4">
@@ -51,8 +63,30 @@ export default function LoginPage() {
           <p className="text-wolf-grey mt-1">Rink Reports</p>
         </div>
 
-        {/* Login Form */}
+        {/* Step Indicator */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {[1, 2, 3].map((s) => (
+            <div
+              key={s}
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                s === currentStep
+                  ? 'bg-navy text-white'
+                  : s < currentStep
+                    ? 'bg-action-green text-white'
+                    : 'bg-gray-200 text-gray-500'
+              }`}
+            >
+              {s}
+            </div>
+          ))}
+        </div>
+
+        {/* Account Form */}
         <div className="card">
+          <h2 className="text-xl font-semibold text-navy dark:text-white mb-4">
+            Create Your Account
+          </h2>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="bg-alert-red/10 text-alert-red px-4 py-3 rounded-lg text-sm">
@@ -75,34 +109,33 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder="At least 8 characters"
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
             />
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-5 h-5 rounded border-wolf-grey text-action-green focus:ring-action-green"
-                />
-                <span className="text-sm">Remember me</span>
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-navy dark:text-action-green hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
+            <Input
+              label="Confirm Password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your password"
+              required
+              autoComplete="new-password"
+            />
 
             <Button type="submit" className="w-full" loading={loading}>
-              Sign In
+              Create Account
             </Button>
           </form>
         </div>
+
+        <p className="text-center text-sm text-wolf-grey mt-4">
+          Already have an account?{' '}
+          <a href="/login" className="text-navy dark:text-action-green hover:underline">
+            Sign in
+          </a>
+        </p>
       </div>
     </div>
   )

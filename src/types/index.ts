@@ -1,14 +1,50 @@
-// Re-export Prisma types for convenience
 export type {
-  Role,
-  FuelType,
+  UserRole,
   ChecklistType,
   Recurrence,
+  FuelType,
+  EquipmentType,
   IncidentType,
   InjuredType,
   SwapStatus,
-  NotificationType,
-} from '@prisma/client'
+  DepthSource,
+  Json,
+  Database,
+} from './database'
+
+// Convenience row types extracted from the Database type
+import type { Database } from './database'
+
+export type Profile = Database['public']['Tables']['profiles']['Row']
+export type Facility = Database['public']['Tables']['facilities']['Row']
+export type ModuleSetting = Database['public']['Tables']['module_settings']['Row']
+export type DailyReportTab = Database['public']['Tables']['daily_report_tabs']['Row']
+export type ChecklistItem = Database['public']['Tables']['checklist_items']['Row']
+export type ChecklistEntry = Database['public']['Tables']['checklist_entries']['Row']
+export type IceDepthTemplate = Database['public']['Tables']['ice_depth_templates']['Row']
+export type IceDepthPoint = Database['public']['Tables']['ice_depth_points']['Row']
+export type IceDepthReading = Database['public']['Tables']['ice_depth_readings']['Row']
+export type Equipment = Database['public']['Tables']['equipment']['Row']
+export type IceCut = Database['public']['Tables']['ice_cuts']['Row']
+export type EdgingLog = Database['public']['Tables']['edging_logs']['Row']
+export type BladeChange = Database['public']['Tables']['blade_changes']['Row']
+export type CircleCheck = Database['public']['Tables']['circle_checks']['Row']
+export type CircleCheckItem = Database['public']['Tables']['circle_check_items']['Row']
+export type CircleCheckResponse = Database['public']['Tables']['circle_check_responses']['Row']
+export type Position = Database['public']['Tables']['positions']['Row']
+export type Shift = Database['public']['Tables']['shifts']['Row']
+export type Availability = Database['public']['Tables']['availability']['Row']
+export type ShiftSwap = Database['public']['Tables']['shift_swaps']['Row']
+export type Incident = Database['public']['Tables']['incidents']['Row']
+export type RefrigerationEquipment = Database['public']['Tables']['refrigeration_equipment']['Row']
+export type RefrigerationReadingType = Database['public']['Tables']['refrigeration_reading_types']['Row']
+export type RefrigerationLog = Database['public']['Tables']['refrigeration_logs']['Row']
+export type RefrigerationReading = Database['public']['Tables']['refrigeration_readings']['Row']
+export type AirQualityMetric = Database['public']['Tables']['air_quality_metrics']['Row']
+export type AirQualityReading = Database['public']['Tables']['air_quality_readings']['Row']
+export type AirQualityReadingValue = Database['public']['Tables']['air_quality_reading_values']['Row']
+export type AirQualityJurisdiction = Database['public']['Tables']['air_quality_jurisdictions']['Row']
+export type Notification = Database['public']['Tables']['notifications']['Row']
 
 // Module identifiers
 export type ModuleId =
@@ -20,7 +56,6 @@ export type ModuleId =
   | 'refrigeration'
   | 'air-quality'
   | 'admin'
-  | 'communication'
 
 // Dashboard module button config
 export interface ModuleConfig {
@@ -68,3 +103,10 @@ export interface NotificationPreferences {
   sms: boolean
   criticalOnly: boolean
 }
+
+// Insert/Update helper types
+export type TableInsert<T extends keyof Database['public']['Tables']> =
+  Database['public']['Tables'][T]['Insert']
+
+export type TableUpdate<T extends keyof Database['public']['Tables']> =
+  Database['public']['Tables'][T]['Update']

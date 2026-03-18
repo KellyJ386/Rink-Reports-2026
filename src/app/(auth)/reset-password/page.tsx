@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -29,18 +30,13 @@ export default function ResetPasswordPage() {
     setLoading(true)
 
     try {
-      const params = new URLSearchParams(window.location.search)
-      const token = params.get('token')
-
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.updateUser({
+        password,
       })
 
-      if (!res.ok) {
-        const data = await res.json()
-        setError(data.message || 'Failed to reset password')
+      if (authError) {
+        setError(authError.message || 'Failed to reset password')
         return
       }
 
