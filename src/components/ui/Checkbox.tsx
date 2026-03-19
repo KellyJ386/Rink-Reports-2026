@@ -22,7 +22,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           {...props}
         />
         <div className="flex-1">
-          <span className={clsx('text-base', props.checked && 'line-through text-wolf-grey')}>
+          <span className={clsx('text-base dark:text-gray-100', props.checked && 'line-through text-wolf-grey dark:text-gray-500')}>
             {label}
           </span>
           {timestamp && (

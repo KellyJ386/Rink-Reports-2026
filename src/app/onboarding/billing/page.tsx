@@ -77,7 +77,7 @@ export default function OnboardingBillingPage() {
           )}
 
           {/* Plan Details */}
-          <div className="border border-action-green rounded-lg p-6 mb-6">
+          <div className="border border-action-green rounded-lg p-6 mb-6 dark:bg-gray-800/50">
             <div className="flex items-baseline justify-between mb-2">
               <h3 className="text-lg font-semibold text-navy dark:text-white">
                 Rink Reports Pro
