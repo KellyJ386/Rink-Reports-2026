@@ -123,9 +123,30 @@ export const BODY_REGIONS_FRONT = [
 
 export const BODY_REGIONS_BACK = [
   { id: 'head_back', label: 'Head (Back)', x: 50, y: 5, w: 12, h: 8 },
-  { id: 'neck', label: 'Neck', x: 50, y: 16, w: 6, h: 4 },
-  { id: 'upper_back', label: 'Upper Back', x: 50, y: 23, w: 22, h: 12 },
-  { id: 'lower_back', label: 'Lower Back', x: 50, y: 38, w: 20, h: 10 },
+  { id: 'neck_back', label: 'Neck (Back)', x: 50, y: 16, w: 6, h: 4 },
+  { id: 'left_shoulder_back', label: 'L Shoulder (Back)', x: 35, y: 20, w: 10, h: 6 },
+  { id: 'right_shoulder_back', label: 'R Shoulder (Back)', x: 65, y: 20, w: 10, h: 6 },
+  { id: 'upper_back', label: 'Upper Back', x: 50, y: 27, w: 22, h: 10 },
+  { id: 'left_upper_arm_back', label: 'L Upper Arm (Back)', x: 27, y: 26, w: 6, h: 12 },
+  { id: 'right_upper_arm_back', label: 'R Upper Arm (Back)', x: 73, y: 26, w: 6, h: 12 },
+  { id: 'left_elbow_back', label: 'L Elbow (Back)', x: 25, y: 38, w: 6, h: 5 },
+  { id: 'right_elbow_back', label: 'R Elbow (Back)', x: 75, y: 38, w: 6, h: 5 },
+  { id: 'lower_back', label: 'Lower Back', x: 50, y: 40, w: 20, h: 10 },
+  { id: 'left_forearm_back', label: 'L Forearm (Back)', x: 22, y: 43, w: 6, h: 10 },
+  { id: 'right_forearm_back', label: 'R Forearm (Back)', x: 78, y: 43, w: 6, h: 10 },
+  { id: 'left_hand_back', label: 'L Hand (Back)', x: 18, y: 57, w: 6, h: 6 },
+  { id: 'right_hand_back', label: 'R Hand (Back)', x: 82, y: 57, w: 6, h: 6 },
+  { id: 'buttocks', label: 'Buttocks', x: 50, y: 52, w: 20, h: 6 },
+  { id: 'left_hamstring', label: 'L Hamstring', x: 42, y: 60, w: 8, h: 14 },
+  { id: 'right_hamstring', label: 'R Hamstring', x: 58, y: 60, w: 8, h: 14 },
+  { id: 'left_knee_back', label: 'L Knee (Back)', x: 42, y: 72, w: 7, h: 5 },
+  { id: 'right_knee_back', label: 'R Knee (Back)', x: 58, y: 72, w: 7, h: 5 },
+  { id: 'left_calf', label: 'L Calf', x: 42, y: 79, w: 7, h: 12 },
+  { id: 'right_calf', label: 'R Calf', x: 58, y: 79, w: 7, h: 12 },
+  { id: 'left_ankle_back', label: 'L Ankle (Back)', x: 42, y: 88, w: 6, h: 4 },
+  { id: 'right_ankle_back', label: 'R Ankle (Back)', x: 58, y: 88, w: 6, h: 4 },
+  { id: 'left_heel', label: 'L Heel', x: 42, y: 93, w: 7, h: 5 },
+  { id: 'right_heel', label: 'R Heel', x: 58, y: 93, w: 7, h: 5 },
 ] as const
 
 // ─── Ice Depth Color Thresholds ──────────────────────────────────────────────
