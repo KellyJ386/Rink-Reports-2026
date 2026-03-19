@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { syncSignupToHubSpot } from '@/lib/hubspot'
 
 export async function POST(request: Request) {
   try {
@@ -68,6 +69,20 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    // Sync to HubSpot (downstream only — fire and forget)
+    syncSignupToHubSpot({
+      facilityName: facility_name,
+      address,
+      city,
+      state,
+      zip,
+      phone,
+      adminEmail: user.email ?? '',
+      adminName: admin_full_name,
+    }).catch((err: unknown) => {
+      console.error('[HubSpot] Signup sync failed:', err instanceof Error ? err.message : err)
+    })
 
     return NextResponse.json({ facility_id: facility.id })
   } catch {

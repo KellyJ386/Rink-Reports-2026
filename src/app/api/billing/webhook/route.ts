@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { tagHubSpotContact } from '@/lib/hubspot'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
@@ -71,6 +72,31 @@ export async function POST(request: Request) {
 
       if (error) {
         console.error('Failed to update facility on subscription deletion:', error.message)
+      }
+
+      // Tag facility admin as churned in HubSpot
+      if (!error) {
+        const { data: facility } = await supabase
+          .from('facilities')
+          .select('id')
+          .eq('stripe_customer_id', customerId)
+          .single()
+
+        if (facility) {
+          const { data: admin } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('facility_id', facility.id)
+            .eq('role', 'facility_admin')
+            .eq('is_active', true)
+            .single()
+
+          if (admin?.email) {
+            tagHubSpotContact(admin.email, 'Churned').catch((err: unknown) => {
+              console.error('[HubSpot] Churn tag failed:', err instanceof Error ? err.message : err)
+            })
+          }
+        }
       }
       break
     }

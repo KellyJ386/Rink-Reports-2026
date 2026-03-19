@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/ui/Icons'
 import { AlertBadge } from '@/components/ui/AlertBadge'
@@ -8,11 +9,36 @@ import { useAuth } from '@/hooks/useAuth'
 
 export default function DashboardPage() {
   const { canAccess } = useAuth()
+  const [alertCounts, setAlertCounts] = useState<Record<string, number>>({})
 
   const visibleModules = MODULES.filter((mod) => canAccess(mod.id))
 
-  // Alert counts will be wired to live data in Phase 3
-  const alertCounts: Record<string, number> = {}
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchAlerts() {
+      try {
+        const res = await fetch('/api/dashboard/alerts')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled) {
+          setAlertCounts(data.counts ?? {})
+        }
+      } catch {
+        // Silently ignore — dashboard still works without alert counts
+      }
+    }
+
+    fetchAlerts()
+
+    // Refresh alert counts every 60 seconds
+    const interval = setInterval(fetchAlerts, 60_000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [])
 
   return (
     <div>
