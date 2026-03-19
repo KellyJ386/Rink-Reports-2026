@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useAuth } from '@/hooks/useAuth'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
 
 interface Template {
   id: string
@@ -24,6 +25,7 @@ interface MeasurementPoint {
 
 export default function IceDepthPage() {
   const { profile } = useAuth()
+  const { isOnline, pendingCount, submitWithOfflineSupport } = useOfflineSync()
 
   const [templates, setTemplates] = useState<Template[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(true)
@@ -93,17 +95,13 @@ export default function IceDepthPage() {
       setSaving(true)
       setError(null)
 
-      const res = await fetch('/api/ice-depth/readings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template_id: selectedRink,
-          point_id: selectedPoint.id,
-          value,
-        }),
+      const res = await submitWithOfflineSupport('/api/ice-depth/readings', 'POST', {
+        template_id: selectedRink,
+        point_id: selectedPoint.id,
+        value,
       })
 
-      if (!res.ok) throw new Error('Failed to save reading')
+      if (res && !res.ok) throw new Error('Failed to save reading')
 
       setPoints((prev) =>
         prev.map((p) =>
@@ -112,7 +110,11 @@ export default function IceDepthPage() {
       )
       setSelectedPoint(null)
       setManualValue('')
-      setSuccessMsg('Reading saved!')
+      if (!res) {
+        setSuccessMsg('Saved offline - will sync when reconnected')
+      } else {
+        setSuccessMsg('Reading saved!')
+      }
       setTimeout(() => setSuccessMsg(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save reading')
@@ -130,18 +132,18 @@ export default function IceDepthPage() {
         .filter((p) => p.value !== undefined)
         .map((p) => ({ point_id: p.id, value: p.value }))
 
-      const res = await fetch('/api/ice-depth/readings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template_id: selectedRink,
-          readings: readingsToSubmit,
-          submit_all: true,
-        }),
+      const res = await submitWithOfflineSupport('/api/ice-depth/readings', 'POST', {
+        template_id: selectedRink,
+        readings: readingsToSubmit,
+        submit_all: true,
       })
 
-      if (!res.ok) throw new Error('Failed to submit readings')
-      setSuccessMsg('All readings submitted successfully!')
+      if (res && !res.ok) throw new Error('Failed to submit readings')
+      if (!res) {
+        setSuccessMsg('Saved offline - will sync when reconnected')
+      } else {
+        setSuccessMsg('All readings submitted successfully!')
+      }
       setTimeout(() => setSuccessMsg(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit readings')
@@ -161,6 +163,14 @@ export default function IceDepthPage() {
           Ice Depth Management
         </h1>
       </div>
+
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="mx-4 mb-4 p-3 bg-alert-yellow/10 text-alert-yellow-dark rounded-lg text-sm flex items-center gap-2">
+          <span>You are offline. Changes will be saved and synced when reconnected.</span>
+          {pendingCount > 0 && <span className="font-medium">({pendingCount} pending)</span>}
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (

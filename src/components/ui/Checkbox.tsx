@@ -16,7 +16,9 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
         <input
           ref={ref}
           type="checkbox"
-          className="w-6 h-6 rounded border-wolf-grey text-action-green focus:ring-action-green cursor-pointer"
+          role="checkbox"
+          aria-checked={props.checked ?? false}
+          className="w-6 h-6 rounded border-wolf-grey text-action-green focus:ring-action-green cursor-pointer dark:bg-gray-800 dark:border-gray-600"
           {...props}
         />
         <div className="flex-1">

@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { useAuth } from '@/hooks/useAuth'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import clsx from 'clsx'
 
 type ViewMode = 'entry' | 'history'
@@ -40,6 +42,8 @@ interface Jurisdiction {
 
 export default function AirQualityPage() {
   const { profile } = useAuth()
+  const { isOnline, pendingCount, submitWithOfflineSupport } = useOfflineSync()
+  const { saveDraft, loadDraft, clearDraft } = useFormDraft()
 
   const [viewMode, setViewMode] = useState<ViewMode>('entry')
   const [loading, setLoading] = useState(true)
@@ -71,6 +75,31 @@ export default function AirQualityPage() {
   const [reportEndDate, setReportEndDate] = useState(new Date().toISOString().split('T')[0])
   const [reportFormat, setReportFormat] = useState('pdf')
   const [reportLocation, setReportLocation] = useState('')
+
+  // Load draft on mount
+  useEffect(() => {
+    async function restoreDraft() {
+      const draft = await loadDraft('air-quality-entry')
+      if (draft) {
+        if (draft.readings) setReadings(draft.readings as Record<string, string>)
+        if (draft.selectedLocation) setSelectedLocation(draft.selectedLocation as string)
+        if (draft.dateTime) setDateTime(draft.dateTime as string)
+        if (draft.entryNotes) setEntryNotes(draft.entryNotes as string)
+      }
+    }
+    restoreDraft()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save draft on field changes
+  useEffect(() => {
+    saveDraft('air-quality-entry', {
+      readings,
+      selectedLocation,
+      dateTime,
+      entryNotes,
+    })
+  }, [readings, selectedLocation, dateTime, entryNotes, saveDraft])
 
   // Fetch metrics, locations, and jurisdictions on mount
   useEffect(() => {
@@ -167,19 +196,29 @@ export default function AirQualityPage() {
     try {
       setSubmitting(true)
 
-      const res = await fetch('/api/air-quality/readings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: selectedLocation,
-          date_time: dateTime,
-          readings: Object.entries(readings).map(([metric_id, value]) => ({
-            metric_id,
-            value: parseFloat(value),
-          })),
-          notes: entryNotes,
-        }),
-      })
+      const submitBody = {
+        location: selectedLocation,
+        date_time: dateTime,
+        readings: Object.entries(readings).map(([metric_id, value]) => ({
+          metric_id,
+          value: parseFloat(value),
+        })),
+        notes: entryNotes,
+      }
+
+      const res = await submitWithOfflineSupport('/api/air-quality/readings', 'POST', submitBody)
+
+      if (res === null) {
+        // Saved offline
+        setSuccessMsg('Saved offline - will sync when reconnected.')
+        setTimeout(() => setSuccessMsg(null), 5000)
+        await clearDraft('air-quality-entry')
+        setReadings({})
+        setSelectedLocation('')
+        setDateTime(new Date().toISOString().slice(0, 16))
+        setEntryNotes('')
+        return
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null)
@@ -188,6 +227,7 @@ export default function AirQualityPage() {
 
       setSuccessMsg('Air quality reading saved successfully!')
       setTimeout(() => setSuccessMsg(null), 3000)
+      await clearDraft('air-quality-entry')
       setReadings({})
       setSelectedLocation('')
       setDateTime(new Date().toISOString().slice(0, 16))
@@ -271,6 +311,14 @@ export default function AirQualityPage() {
           </div>
         </div>
       </div>
+
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="mx-4 mb-4 p-3 bg-alert-yellow/10 text-alert-yellow-dark rounded-lg text-sm flex items-center gap-2">
+          <span>You are offline. Changes will be saved and synced when reconnected.</span>
+          {pendingCount > 0 && <span className="font-medium">({pendingCount} pending)</span>}
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (

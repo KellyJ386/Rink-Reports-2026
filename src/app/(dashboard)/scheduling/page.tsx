@@ -7,6 +7,8 @@ import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useAuth } from '@/hooks/useAuth'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import clsx from 'clsx'
 
 type CalendarView = 'day' | 'week' | 'month'
@@ -49,6 +51,8 @@ interface SwapRequest {
 
 export default function SchedulingPage() {
   const { profile } = useAuth()
+  const { isOnline, pendingCount, submitWithOfflineSupport } = useOfflineSync()
+  const { saveDraft, loadDraft, clearDraft } = useFormDraft()
 
   const [view, setView] = useState<CalendarView>('week')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -151,6 +155,36 @@ export default function SchedulingPage() {
     fetchSwaps()
   }, [])
 
+  // Load draft when create shift modal opens
+  useEffect(() => {
+    if (!showCreateModal) return
+    const draftKey = 'scheduling-new-shift'
+    loadDraft(draftKey).then((draft) => {
+      if (draft) {
+        if (typeof draft.newShiftDate === 'string') setNewShiftDate(draft.newShiftDate)
+        if (typeof draft.newShiftStart === 'string') setNewShiftStart(draft.newShiftStart)
+        if (typeof draft.newShiftEnd === 'string') setNewShiftEnd(draft.newShiftEnd)
+        if (typeof draft.newShiftType === 'string') setNewShiftType(draft.newShiftType)
+        if (typeof draft.newShiftEmployee === 'string') setNewShiftEmployee(draft.newShiftEmployee)
+        if (typeof draft.newShiftNotes === 'string') setNewShiftNotes(draft.newShiftNotes)
+      }
+    })
+  }, [showCreateModal, loadDraft])
+
+  // Save draft on create shift field changes
+  useEffect(() => {
+    if (!showCreateModal) return
+    const draftKey = 'scheduling-new-shift'
+    saveDraft(draftKey, {
+      newShiftDate,
+      newShiftStart,
+      newShiftEnd,
+      newShiftType,
+      newShiftEmployee,
+      newShiftNotes,
+    })
+  }, [showCreateModal, newShiftDate, newShiftStart, newShiftEnd, newShiftType, newShiftEmployee, newShiftNotes, saveDraft])
+
   function navigateWeek(direction: number) {
     const current = new Date(weekStartDate + 'T00:00:00')
     current.setDate(current.getDate() + direction * 7)
@@ -176,26 +210,27 @@ export default function SchedulingPage() {
 
     try {
       setSubmitting(true)
-      const res = await fetch('/api/scheduling/shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: newShiftDate,
-          start_time: newShiftStart,
-          end_time: newShiftEnd,
-          shift_type_id: newShiftType,
-          employee_id: newShiftEmployee || null,
-          notes: newShiftNotes,
-        }),
+      const res = await submitWithOfflineSupport('/api/scheduling/shifts', 'POST', {
+        date: newShiftDate,
+        start_time: newShiftStart,
+        end_time: newShiftEnd,
+        shift_type_id: newShiftType,
+        employee_id: newShiftEmployee || null,
+        notes: newShiftNotes,
       })
 
-      if (!res.ok) {
+      if (res && !res.ok) {
         const errData = await res.json().catch(() => null)
         throw new Error(errData?.error || 'Failed to create shift')
       }
 
-      setSuccessMsg('Shift created successfully!')
+      if (!res) {
+        setSuccessMsg('Saved offline - will sync when reconnected')
+      } else {
+        setSuccessMsg('Shift created successfully!')
+      }
       setTimeout(() => setSuccessMsg(null), 3000)
+      await clearDraft('scheduling-new-shift')
       setShowCreateModal(false)
       setNewShiftDate('')
       setNewShiftStart('')
@@ -227,6 +262,14 @@ export default function SchedulingPage() {
           </Button>
         </div>
       </div>
+
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="mx-4 mb-4 p-3 bg-alert-yellow/10 text-alert-yellow-dark rounded-lg text-sm flex items-center gap-2">
+          <span>You are offline. Changes will be saved and synced when reconnected.</span>
+          {pendingCount > 0 && <span className="font-medium">({pendingCount} pending)</span>}
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (

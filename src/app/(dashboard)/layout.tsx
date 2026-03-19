@@ -26,8 +26,9 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-navy-dark">
-        <div className="animate-spin h-8 w-8 border-4 border-navy border-t-transparent rounded-full" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-navy-dark" role="status" aria-live="polite">
+        <div className="animate-spin h-8 w-8 border-4 border-navy border-t-transparent rounded-full" aria-hidden="true" />
+        <span className="sr-only">Loading...</span>
       </div>
     )
   }
@@ -69,7 +70,7 @@ export default function DashboardLayout({
           onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
           notificationCount={0}
         />
-        <main className="p-4 lg:p-6">{children}</main>
+        <main className="p-4 lg:p-6" aria-live="polite">{children}</main>
       </div>
     </div>
   )

@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Icon } from '@/components/ui/Icons'
 import { useAuth } from '@/hooks/useAuth'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import clsx from 'clsx'
 
 type ChecklistType = 'OPENING' | 'CLOSING' | 'DAILY_OPS'
@@ -32,6 +34,8 @@ interface ChecklistItem {
 
 export default function DailyReportsPage() {
   const { profile } = useAuth()
+  const { isOnline, pendingCount, submitWithOfflineSupport } = useOfflineSync()
+  const { saveDraft, loadDraft, clearDraft } = useFormDraft()
 
   const [tabs, setTabs] = useState<Tab[]>([])
   const [loadingTabs, setLoadingTabs] = useState(true)
@@ -104,6 +108,24 @@ export default function DailyReportsPage() {
     }
   }, [])
 
+  // Load draft for notes when tab/type/date selection changes
+  useEffect(() => {
+    if (!selectedTab || !selectedType || !selectedDate) return
+    const draftKey = `daily-reports-${selectedTab}-${selectedType}-${selectedDate}`
+    loadDraft(draftKey).then((draft) => {
+      if (draft && typeof draft.notes === 'string') {
+        setNotes(draft.notes)
+      }
+    })
+  }, [selectedTab, selectedType, selectedDate, loadDraft])
+
+  // Save draft on notes change
+  useEffect(() => {
+    if (!selectedTab || !selectedType || !selectedDate) return
+    const draftKey = `daily-reports-${selectedTab}-${selectedType}-${selectedDate}`
+    saveDraft(draftKey, { notes })
+  }, [notes, selectedTab, selectedType, selectedDate, saveDraft])
+
   function handleTabClick(tabId: string) {
     setSelectedTab(tabId)
     setShowTypeSelector(true)
@@ -139,17 +161,16 @@ export default function DailyReportsPage() {
     )
 
     try {
-      const res = await fetch('/api/daily-reports/entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tab_id: selectedTab,
-          item_id: itemId,
-          checked: newChecked,
-          date: selectedDate,
-        }),
+      const res = await submitWithOfflineSupport('/api/daily-reports/entries', 'POST', {
+        tab_id: selectedTab,
+        item_id: itemId,
+        checked: newChecked,
+        date: selectedDate,
       })
-      if (!res.ok) throw new Error('Failed to save entry')
+      if (res && !res.ok) throw new Error('Failed to save entry')
+      if (!res) {
+        // Saved offline, keep the optimistic update
+      }
     } catch (err) {
       // Revert on error
       setItems((prev) =>
@@ -167,19 +188,21 @@ export default function DailyReportsPage() {
     try {
       setSaving(true)
       setError(null)
-      const res = await fetch('/api/daily-reports/entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tab_id: selectedTab,
-          checklist_type: selectedType,
-          date: selectedDate,
-          notes,
-          items: items.map((i) => ({ id: i.id, checked: i.checked })),
-        }),
+      const res = await submitWithOfflineSupport('/api/daily-reports/entries', 'POST', {
+        tab_id: selectedTab,
+        checklist_type: selectedType,
+        date: selectedDate,
+        notes,
+        items: items.map((i) => ({ id: i.id, checked: i.checked })),
       })
-      if (!res.ok) throw new Error('Failed to save checklist')
-      setSuccessMsg('Checklist saved successfully!')
+      if (res && !res.ok) throw new Error('Failed to save checklist')
+      if (!res) {
+        setSuccessMsg('Saved offline - will sync when reconnected')
+      } else {
+        setSuccessMsg('Checklist saved successfully!')
+      }
+      const draftKey = `daily-reports-${selectedTab}-${selectedType}-${selectedDate}`
+      await clearDraft(draftKey)
       setTimeout(() => setSuccessMsg(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save checklist')
@@ -195,6 +218,14 @@ export default function DailyReportsPage() {
       <h1 className="text-2xl font-bold text-navy dark:text-white mb-6 px-4">
         Daily Reports
       </h1>
+
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="mx-4 mb-4 p-3 bg-alert-yellow/10 text-alert-yellow-dark rounded-lg text-sm flex items-center gap-2">
+          <span>You are offline. Changes will be saved and synced when reconnected.</span>
+          {pendingCount > 0 && <span className="font-medium">({pendingCount} pending)</span>}
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (

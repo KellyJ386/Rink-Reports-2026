@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { useAuth } from '@/hooks/useAuth'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import clsx from 'clsx'
 
 type Tab = 'ice-cut' | 'blade-change' | 'edging' | 'circle-check'
@@ -72,6 +74,8 @@ interface CircleCheckRecord {
 
 export default function IceOperationsPage() {
   const { profile } = useAuth()
+  const { isOnline, pendingCount, submitWithOfflineSupport } = useOfflineSync()
+  const { saveDraft, loadDraft, clearDraft } = useFormDraft()
 
   const [activeTab, setActiveTab] = useState<Tab>('ice-cut')
   const [loading, setLoading] = useState(true)
@@ -183,6 +187,38 @@ export default function IceOperationsPage() {
     fetchHistory(activeTab)
   }, [activeTab, fetchHistory])
 
+  // Load draft when tab changes
+  useEffect(() => {
+    const draftKey = `ice-ops-${activeTab}`
+    loadDraft(draftKey).then((draft) => {
+      if (draft) {
+        if (typeof draft.selectedRink === 'string') setSelectedRink(draft.selectedRink)
+        if (typeof draft.selectedMachine === 'string') setSelectedMachine(draft.selectedMachine)
+        if (typeof draft.dateTime === 'string') setDateTime(draft.dateTime)
+        if (typeof draft.machineHours === 'string') setMachineHours(draft.machineHours)
+        if (typeof draft.iceTaken === 'string') setIceTaken(draft.iceTaken)
+        if (typeof draft.waterUsed === 'string') setWaterUsed(draft.waterUsed)
+        if (typeof draft.notes === 'string') setNotes(draft.notes)
+        if (typeof draft.fuelType === 'string') setFuelType(draft.fuelType)
+      }
+    })
+  }, [activeTab, loadDraft])
+
+  // Save draft on field changes
+  useEffect(() => {
+    const draftKey = `ice-ops-${activeTab}`
+    saveDraft(draftKey, {
+      selectedRink,
+      selectedMachine,
+      dateTime,
+      machineHours,
+      iceTaken,
+      waterUsed,
+      notes,
+      fuelType,
+    })
+  }, [activeTab, selectedRink, selectedMachine, dateTime, machineHours, iceTaken, waterUsed, notes, fuelType, saveDraft])
+
   function handleCircleCheckToggle(itemId: string) {
     setCircleCheckResults((prev) => ({
       ...prev,
@@ -255,19 +291,21 @@ export default function IceOperationsPage() {
           break
       }
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+      const res = await submitWithOfflineSupport(endpoint, 'POST', body)
 
-      if (!res.ok) {
+      if (res && !res.ok) {
         const errData = await res.json().catch(() => null)
         throw new Error(errData?.error || `Failed to save ${activeTab}`)
       }
 
-      setSuccessMsg(`${TABS.find((t) => t.id === activeTab)?.label} saved successfully!`)
+      if (!res) {
+        setSuccessMsg('Saved offline - will sync when reconnected')
+      } else {
+        setSuccessMsg(`${TABS.find((t) => t.id === activeTab)?.label} saved successfully!`)
+      }
       setTimeout(() => setSuccessMsg(null), 3000)
+      const draftKey = `ice-ops-${activeTab}`
+      await clearDraft(draftKey)
       resetForm()
       fetchHistory(activeTab)
     } catch (err) {
@@ -286,6 +324,14 @@ export default function IceOperationsPage() {
       <h1 className="text-2xl font-bold text-navy dark:text-white mb-6 px-4">
         Ice Operations
       </h1>
+
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="mx-4 mb-4 p-3 bg-alert-yellow/10 text-alert-yellow-dark rounded-lg text-sm flex items-center gap-2">
+          <span>You are offline. Changes will be saved and synced when reconnected.</span>
+          {pendingCount > 0 && <span className="font-medium">({pendingCount} pending)</span>}
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (

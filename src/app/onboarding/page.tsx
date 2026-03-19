@@ -70,10 +70,10 @@ export default function OnboardingAccountPage() {
               key={s}
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 s === currentStep
-                  ? 'bg-navy text-white'
+                  ? 'bg-navy text-white dark:bg-action-green'
                   : s < currentStep
                     ? 'bg-action-green text-white'
-                    : 'bg-gray-200 text-gray-500'
+                    : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
               }`}
             >
               {s}

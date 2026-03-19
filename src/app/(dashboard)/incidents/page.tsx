@@ -8,6 +8,8 @@ import { Select } from '@/components/ui/Select'
 import { BodyDiagram } from '@/components/diagrams/BodyDiagram'
 import { BODY_REGIONS_FRONT, BODY_REGIONS_BACK } from '@/lib/constants'
 import { useAuth } from '@/hooks/useAuth'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import clsx from 'clsx'
 
 type ViewMode = 'form' | 'history'
@@ -30,6 +32,8 @@ interface HistoryItem {
 
 export default function IncidentsPage() {
   const { profile } = useAuth()
+  const { isOnline, pendingCount, submitWithOfflineSupport } = useOfflineSync()
+  const { saveDraft, loadDraft, clearDraft } = useFormDraft()
 
   const [viewMode, setViewMode] = useState<ViewMode>('form')
   const [loading, setLoading] = useState(false)
@@ -82,6 +86,43 @@ export default function IncidentsPage() {
     }
     fetchLocations()
   }, [])
+
+  // Load draft on mount
+  useEffect(() => {
+    async function restoreDraft() {
+      const draftKey = `incidents-${incidentType || 'new'}`
+      const draft = await loadDraft(draftKey)
+      if (draft) {
+        if (draft.incidentType) setIncidentType(draft.incidentType as string)
+        if (draft.incidentDate) setIncidentDate(draft.incidentDate as string)
+        if (draft.incidentTime) setIncidentTime(draft.incidentTime as string)
+        if (draft.incidentLocation) setIncidentLocation(draft.incidentLocation as string)
+        if (draft.description) setDescription(draft.description as string)
+        if (draft.injuredName) setInjuredName(draft.injuredName as string)
+        if (draft.injuredPartyType) setInjuredPartyType(draft.injuredPartyType as string)
+        if (draft.witnesses) setWitnesses(draft.witnesses as string)
+        if (draft.selectedBodyParts) setSelectedBodyParts(draft.selectedBodyParts as string[])
+      }
+    }
+    restoreDraft()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save draft on field changes
+  useEffect(() => {
+    const draftKey = `incidents-${incidentType || 'new'}`
+    saveDraft(draftKey, {
+      incidentType,
+      incidentDate,
+      incidentTime,
+      incidentLocation,
+      description,
+      injuredName,
+      injuredPartyType,
+      witnesses,
+      selectedBodyParts,
+    })
+  }, [incidentType, incidentDate, incidentTime, incidentLocation, description, injuredName, injuredPartyType, witnesses, selectedBodyParts, saveDraft])
 
   // Fetch history
   const fetchHistory = useCallback(async () => {
@@ -149,11 +190,16 @@ export default function IncidentsPage() {
         body.body_parts = selectedBodyParts
       }
 
-      const res = await fetch('/api/incidents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+      const res = await submitWithOfflineSupport('/api/incidents', 'POST', body)
+
+      if (res === null) {
+        // Saved offline
+        setSuccessMsg('Saved offline - will sync when reconnected.')
+        setTimeout(() => setSuccessMsg(null), 5000)
+        await clearDraft(`incidents-${incidentType || 'new'}`)
+        resetForm()
+        return
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null)
@@ -162,6 +208,7 @@ export default function IncidentsPage() {
 
       setSuccessMsg('Incident report submitted successfully!')
       setTimeout(() => setSuccessMsg(null), 3000)
+      await clearDraft(`incidents-${incidentType || 'new'}`)
       resetForm()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit report')
@@ -193,6 +240,14 @@ export default function IncidentsPage() {
           </button>
         </div>
       </div>
+
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="mx-4 mb-4 p-3 bg-alert-yellow/10 text-alert-yellow-dark rounded-lg text-sm flex items-center gap-2">
+          <span>You are offline. Changes will be saved and synced when reconnected.</span>
+          {pendingCount > 0 && <span className="font-medium">({pendingCount} pending)</span>}
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (

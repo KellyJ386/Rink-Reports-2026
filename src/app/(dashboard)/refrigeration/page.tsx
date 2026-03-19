@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useAuth } from '@/hooks/useAuth'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useFormDraft } from '@/hooks/useFormDraft'
 import clsx from 'clsx'
 
 type ViewMode = 'entry' | 'history'
@@ -38,6 +40,8 @@ interface HistoryRow {
 
 export default function RefrigerationPage() {
   const { profile } = useAuth()
+  const { isOnline, pendingCount, submitWithOfflineSupport } = useOfflineSync()
+  const { saveDraft, loadDraft, clearDraft } = useFormDraft()
 
   const [viewMode, setViewMode] = useState<ViewMode>('entry')
   const [loading, setLoading] = useState(true)
@@ -93,8 +97,15 @@ export default function RefrigerationPage() {
         if (!res.ok) throw new Error('Failed to load reading fields')
         const data = await res.json()
         setReadingFields(data)
-        setReadings({})
-        setReadingNotes('')
+        // Load draft for this equipment if available
+        const draft = await loadDraft(`refrigeration-${selectedEquipment}`)
+        if (draft) {
+          setReadings((draft.readings as Record<string, string>) || {})
+          setReadingNotes((draft.readingNotes as string) || '')
+        } else {
+          setReadings({})
+          setReadingNotes('')
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load reading fields')
       } finally {
@@ -102,7 +113,16 @@ export default function RefrigerationPage() {
       }
     }
     fetchFields()
-  }, [selectedEquipment])
+  }, [selectedEquipment, loadDraft])
+
+  // Save draft on reading changes
+  useEffect(() => {
+    if (!selectedEquipment) return
+    saveDraft(`refrigeration-${selectedEquipment}`, {
+      readings,
+      readingNotes,
+    })
+  }, [readings, readingNotes, selectedEquipment, saveDraft])
 
   // Fetch history
   const fetchHistory = useCallback(async () => {
@@ -147,18 +167,27 @@ export default function RefrigerationPage() {
     try {
       setSubmitting(true)
 
-      const res = await fetch('/api/refrigeration/readings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          equipment_id: selectedEquipment,
-          readings: Object.entries(readings).map(([field_id, value]) => ({
-            field_id,
-            value,
-          })),
-          notes: readingNotes,
-        }),
-      })
+      const submitBody = {
+        equipment_id: selectedEquipment,
+        readings: Object.entries(readings).map(([field_id, value]) => ({
+          field_id,
+          value,
+        })),
+        notes: readingNotes,
+      }
+
+      const res = await submitWithOfflineSupport('/api/refrigeration/readings', 'POST', submitBody)
+
+      if (res === null) {
+        // Saved offline
+        setSuccessMsg('Saved offline - will sync when reconnected.')
+        setTimeout(() => setSuccessMsg(null), 5000)
+        await clearDraft(`refrigeration-${selectedEquipment}`)
+        setSelectedEquipment(null)
+        setReadings({})
+        setReadingNotes('')
+        return
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null)
@@ -167,6 +196,7 @@ export default function RefrigerationPage() {
 
       setSuccessMsg('Reading saved successfully!')
       setTimeout(() => setSuccessMsg(null), 3000)
+      await clearDraft(`refrigeration-${selectedEquipment}`)
       setSelectedEquipment(null)
       setReadings({})
       setReadingNotes('')
@@ -207,6 +237,14 @@ export default function RefrigerationPage() {
           </button>
         </div>
       </div>
+
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="mx-4 mb-4 p-3 bg-alert-yellow/10 text-alert-yellow-dark rounded-lg text-sm flex items-center gap-2">
+          <span>You are offline. Changes will be saved and synced when reconnected.</span>
+          {pendingCount > 0 && <span className="font-medium">({pendingCount} pending)</span>}
+        </div>
+      )}
 
       {/* Error / Success messages */}
       {error && (

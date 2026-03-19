@@ -1,10 +1,13 @@
-// Service Worker for offline support
-const CACHE_NAME = 'rink-reports-v1'
+// Service Worker for Rink Reports offline support
+const CACHE_NAME = 'rink-reports-v2'
 const STATIC_ASSETS = [
   '/',
   '/dashboard',
   '/manifest.json',
 ]
+
+// API paths that should NOT be cached
+const API_PREFIX = '/api/'
 
 // Install: cache static assets
 self.addEventListener('install', (event) => {
@@ -24,22 +27,47 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Fetch: network first, fall back to cache
+// Fetch: network first, fall back to cache for GET requests
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests (form submissions queue via IndexedDB)
-  if (event.request.method !== 'GET') return
+  const { request } = event
+  const url = new URL(request.url)
 
+  // Skip non-GET requests (form submissions queue via IndexedDB)
+  if (request.method !== 'GET') return
+
+  // Skip API requests from caching (they use IndexedDB queue for offline)
+  if (url.pathname.startsWith(API_PREFIX)) return
+
+  // Skip chrome-extension and other non-http(s) requests
+  if (!url.protocol.startsWith('http')) return
+
+  // For Next.js pages and static assets: network-first with cache fallback
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
-        // Cache successful responses
-        if (response.ok) {
+        // Cache successful responses for app shell
+        if (response.ok && (
+          url.pathname === '/' ||
+          url.pathname.startsWith('/dashboard') ||
+          url.pathname.startsWith('/_next/static') ||
+          url.pathname === '/manifest.json'
+        )) {
           const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
         }
         return response
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => {
+        // Offline: serve from cache
+        return caches.match(request).then((cached) => {
+          if (cached) return cached
+          // For navigation requests, serve the cached root page
+          if (request.mode === 'navigate') {
+            return caches.match('/') || new Response('Offline', { status: 503 })
+          }
+          return new Response('Offline', { status: 503 })
+        })
+      })
   )
 })
 
@@ -51,9 +79,16 @@ self.addEventListener('sync', (event) => {
 })
 
 async function syncQueuedData() {
-  // Notify clients to process sync queue
+  // Notify all open tabs to process their sync queues
   const clients = await self.clients.matchAll()
   clients.forEach((client) => {
     client.postMessage({ type: 'SYNC_REQUESTED' })
   })
 }
+
+// Listen for messages from clients
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})

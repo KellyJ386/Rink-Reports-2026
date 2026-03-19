@@ -29,6 +29,9 @@ export function Toast({ message, type = 'success', onClose, duration = 3000 }: T
 
   return (
     <div
+      role="alert"
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
       className={clsx(
         'fixed bottom-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all duration-300',
         typeStyles[type],
