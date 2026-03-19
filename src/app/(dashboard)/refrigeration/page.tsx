@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { useAuth } from '@/hooks/useAuth'
 import clsx from 'clsx'
 
 type ViewMode = 'entry' | 'history'
@@ -17,47 +18,170 @@ interface EquipmentItem {
   status: 'ok' | 'warning' | 'none'
 }
 
-const EQUIPMENT: EquipmentItem[] = [
-  { id: '1', name: 'Compressor #1 - Rink A', type: 'compressor', lastReading: '2 hours ago', status: 'ok' },
-  { id: '2', name: 'Compressor #2 - Rink A', type: 'compressor', lastReading: '2 hours ago', status: 'warning' },
-  { id: '3', name: 'Compressor #3 - Rink B', type: 'compressor', lastReading: '4 hours ago', status: 'ok' },
-  { id: '4', name: 'Glycol Pump - Main', type: 'pump', lastReading: '2 hours ago', status: 'ok' },
-  { id: '5', name: 'Brine Pump - Rink A', type: 'pump', lastReading: null, status: 'none' },
-  { id: '6', name: 'Condenser Unit #1', type: 'condenser', lastReading: '3 hours ago', status: 'ok' },
-]
+interface ReadingField {
+  id: string
+  label: string
+  unit: string
+  min: number | null
+  max: number | null
+  input_type?: string
+  options?: { value: string; label: string }[]
+}
 
-// Mock reading types for a compressor
-const COMPRESSOR_FIELDS = [
-  { id: 'head-pressure', label: 'Head Pressure', unit: 'PSI', min: 150, max: 250 },
-  { id: 'suction-pressure', label: 'Suction Pressure', unit: 'PSI', min: 20, max: 60 },
-  { id: 'brine-temp', label: 'Brine Temperature', unit: '°F', min: 15, max: 30 },
-  { id: 'condenser-temp', label: 'Condenser Temperature', unit: '°F', min: 70, max: 105 },
-  { id: 'oil-level', label: 'Oil Level', unit: '', min: null, max: null },
-]
+interface HistoryRow {
+  id: string
+  equipment_name: string
+  timestamp: string
+  readings: Record<string, string | number>
+  operator: string
+}
 
 export default function RefrigerationPage() {
-  const [viewMode, setViewMode] = useState<ViewMode>('entry')
-  const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
-  const [readings, setReadings] = useState<Record<string, string>>({})
+  const { profile } = useAuth()
 
-  const equipment = EQUIPMENT.find((e) => e.id === selectedEquipment)
+  const [viewMode, setViewMode] = useState<ViewMode>('entry')
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  // Equipment list
+  const [equipment, setEquipment] = useState<EquipmentItem[]>([])
+  const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
+
+  // Reading fields for selected equipment
+  const [readingFields, setReadingFields] = useState<ReadingField[]>([])
+  const [loadingFields, setLoadingFields] = useState(false)
+  const [readings, setReadings] = useState<Record<string, string>>({})
+  const [readingNotes, setReadingNotes] = useState('')
+
+  // History
+  const [historyRows, setHistoryRows] = useState<HistoryRow[]>([])
+  const [historyEquipmentFilter, setHistoryEquipmentFilter] = useState('')
+  const [historyDateFilter, setHistoryDateFilter] = useState('')
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  const selectedEquipmentData = equipment.find((e) => e.id === selectedEquipment)
+
+  // Fetch equipment on mount
+  useEffect(() => {
+    async function fetchEquipment() {
+      try {
+        setLoading(true)
+        const res = await fetch('/api/refrigeration/equipment')
+        if (!res.ok) throw new Error('Failed to load equipment')
+        const data = await res.json()
+        setEquipment(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load equipment')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchEquipment()
+  }, [])
+
+  // Fetch reading fields when equipment is selected
+  useEffect(() => {
+    if (!selectedEquipment) return
+
+    async function fetchFields() {
+      try {
+        setLoadingFields(true)
+        setError(null)
+        const res = await fetch(`/api/refrigeration/equipment/${selectedEquipment}/fields`)
+        if (!res.ok) throw new Error('Failed to load reading fields')
+        const data = await res.json()
+        setReadingFields(data)
+        setReadings({})
+        setReadingNotes('')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load reading fields')
+      } finally {
+        setLoadingFields(false)
+      }
+    }
+    fetchFields()
+  }, [selectedEquipment])
+
+  // Fetch history
+  const fetchHistory = useCallback(async () => {
+    try {
+      setLoadingHistory(true)
+      const params = new URLSearchParams()
+      if (historyEquipmentFilter) params.set('equipment_id', historyEquipmentFilter)
+      if (historyDateFilter) params.set('date', historyDateFilter)
+
+      const res = await fetch(`/api/refrigeration/readings?${params.toString()}`)
+      if (!res.ok) throw new Error('Failed to load reading history')
+      const data = await res.json()
+      setHistoryRows(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load history')
+    } finally {
+      setLoadingHistory(false)
+    }
+  }, [historyEquipmentFilter, historyDateFilter])
+
+  useEffect(() => {
+    if (viewMode === 'history') {
+      fetchHistory()
+    }
+  }, [viewMode, fetchHistory])
 
   function handleReadingChange(fieldId: string, value: string) {
     setReadings((prev) => ({ ...prev, [fieldId]: value }))
   }
 
   function isOutOfRange(fieldId: string): boolean {
-    const field = COMPRESSOR_FIELDS.find((f) => f.id === fieldId)
+    const field = readingFields.find((f) => f.id === fieldId)
     const value = parseFloat(readings[fieldId])
     if (!field || isNaN(value) || field.min === null) return false
-    return value < field.min || value > field.max!
+    return value < field.min || value > (field.max ?? Infinity)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    alert('Reading saved!')
-    setSelectedEquipment(null)
-    setReadings({})
+    setError(null)
+
+    try {
+      setSubmitting(true)
+
+      const res = await fetch('/api/refrigeration/readings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipment_id: selectedEquipment,
+          readings: Object.entries(readings).map(([field_id, value]) => ({
+            field_id,
+            value,
+          })),
+          notes: readingNotes,
+        }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null)
+        throw new Error(errData?.error || 'Failed to save reading')
+      }
+
+      setSuccessMsg('Reading saved successfully!')
+      setTimeout(() => setSuccessMsg(null), 3000)
+      setSelectedEquipment(null)
+      setReadings({})
+      setReadingNotes('')
+
+      // Refresh equipment list to update last reading times
+      const equipRes = await fetch('/api/refrigeration/equipment')
+      if (equipRes.ok) {
+        const data = await equipRes.json()
+        setEquipment(data)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save reading')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -84,10 +208,30 @@ export default function RefrigerationPage() {
         </div>
       </div>
 
-      {viewMode === 'entry' && !selectedEquipment && (
+      {/* Error / Success messages */}
+      {error && (
+        <div className="mx-4 mb-4 p-3 bg-alert-red/10 text-alert-red rounded-lg text-sm">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="mx-4 mb-4 p-3 bg-action-green/10 text-action-green rounded-lg text-sm">
+          {successMsg}
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-navy" />
+        </div>
+      )}
+
+      {!loading && viewMode === 'entry' && !selectedEquipment && (
         <div className="px-4 space-y-3 max-w-2xl">
           <p className="text-sm text-wolf-grey mb-4">Select equipment to enter readings:</p>
-          {EQUIPMENT.map((item) => (
+          {equipment.map((item) => (
             <button
               key={item.id}
               onClick={() => setSelectedEquipment(item.id)}
@@ -117,7 +261,7 @@ export default function RefrigerationPage() {
         </div>
       )}
 
-      {viewMode === 'entry' && selectedEquipment && equipment && (
+      {!loading && viewMode === 'entry' && selectedEquipment && selectedEquipmentData && (
         <div className="px-4 max-w-2xl">
           <button
             onClick={() => setSelectedEquipment(null)}
@@ -126,46 +270,55 @@ export default function RefrigerationPage() {
             &larr; Back to equipment list
           </button>
 
-          <form onSubmit={handleSubmit} className="card space-y-4">
-            <h2 className="text-lg font-semibold">{equipment.name}</h2>
+          {loadingFields ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-navy" />
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="card space-y-4">
+              <h2 className="text-lg font-semibold">{selectedEquipmentData.name}</h2>
 
-            {COMPRESSOR_FIELDS.map((field) => (
-              <div key={field.id}>
-                {field.id === 'oil-level' ? (
-                  <Select
-                    label={field.label}
-                    options={[
-                      { value: 'ok', label: 'OK' },
-                      { value: 'low', label: 'Low' },
-                      { value: 'add', label: 'Add' },
-                    ]}
-                    placeholder="Select level"
-                    value={readings[field.id] || ''}
-                    onChange={(e) => handleReadingChange(field.id, e.target.value)}
-                  />
-                ) : (
-                  <div>
-                    <Input
-                      label={`${field.label} (${field.unit})`}
-                      type="number"
-                      step="0.1"
+              {readingFields.map((field) => (
+                <div key={field.id}>
+                  {field.input_type === 'select' && field.options ? (
+                    <Select
+                      label={field.label}
+                      options={field.options}
+                      placeholder="Select level"
                       value={readings[field.id] || ''}
                       onChange={(e) => handleReadingChange(field.id, e.target.value)}
-                      placeholder={`${field.min} - ${field.max} ${field.unit}`}
-                      error={isOutOfRange(field.id) ? `Out of range! Expected ${field.min}-${field.max} ${field.unit}` : undefined}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div>
+                      <Input
+                        label={`${field.label}${field.unit ? ` (${field.unit})` : ''}`}
+                        type="number"
+                        step="0.1"
+                        value={readings[field.id] || ''}
+                        onChange={(e) => handleReadingChange(field.id, e.target.value)}
+                        placeholder={field.min !== null && field.max !== null ? `${field.min} - ${field.max} ${field.unit}` : `Enter ${field.unit}`}
+                        error={isOutOfRange(field.id) ? `Out of range! Expected ${field.min}-${field.max} ${field.unit}` : undefined}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <div>
+                <label className="form-label">Notes (optional)</label>
+                <textarea
+                  className="form-input min-h-[60px]"
+                  placeholder="Add any notes..."
+                  value={readingNotes}
+                  onChange={(e) => setReadingNotes(e.target.value)}
+                />
               </div>
-            ))}
 
-            <div>
-              <label className="form-label">Notes (optional)</label>
-              <textarea className="form-input min-h-[60px]" placeholder="Add any notes..." />
-            </div>
-
-            <Button type="submit" size="lg">Save Reading</Button>
-          </form>
+              <Button type="submit" size="lg" disabled={submitting}>
+                {submitting ? 'Saving...' : 'Save Reading'}
+              </Button>
+            </form>
+          )}
         </div>
       )}
 
@@ -173,52 +326,78 @@ export default function RefrigerationPage() {
         <div className="px-4 max-w-4xl">
           <div className="flex gap-3 mb-4">
             <Select
-              options={[{ value: '', label: 'All Equipment' }, ...EQUIPMENT.map((e) => ({ value: e.id, label: e.name }))]}
+              options={[{ value: '', label: 'All Equipment' }, ...equipment.map((e) => ({ value: e.id, label: e.name }))]}
               className="max-w-[300px]"
+              value={historyEquipmentFilter}
+              onChange={(e) => setHistoryEquipmentFilter(e.target.value)}
             />
-            <Input type="date" className="max-w-[180px]" />
+            <Input
+              type="date"
+              className="max-w-[180px]"
+              value={historyDateFilter}
+              onChange={(e) => setHistoryDateFilter(e.target.value)}
+            />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-2">Equipment</th>
-                  <th className="text-left py-3 px-2">Time</th>
-                  <th className="text-left py-3 px-2">Head PSI</th>
-                  <th className="text-left py-3 px-2">Suction PSI</th>
-                  <th className="text-left py-3 px-2">Brine °F</th>
-                  <th className="text-left py-3 px-2">Operator</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="py-3 px-2">Compressor #1</td>
-                  <td className="py-3 px-2">10:00 AM</td>
-                  <td className="py-3 px-2">195</td>
-                  <td className="py-3 px-2">35</td>
-                  <td className="py-3 px-2">22</td>
-                  <td className="py-3 px-2">John D.</td>
-                </tr>
-                <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="py-3 px-2">Compressor #2</td>
-                  <td className="py-3 px-2">10:05 AM</td>
-                  <td className="py-3 px-2 text-alert-red font-medium">275</td>
-                  <td className="py-3 px-2">42</td>
-                  <td className="py-3 px-2">24</td>
-                  <td className="py-3 px-2">John D.</td>
-                </tr>
-                <tr className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="py-3 px-2">Compressor #1</td>
-                  <td className="py-3 px-2">8:00 AM</td>
-                  <td className="py-3 px-2">200</td>
-                  <td className="py-3 px-2">38</td>
-                  <td className="py-3 px-2">21</td>
-                  <td className="py-3 px-2">Sarah M.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {loadingHistory ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-navy" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2">Equipment</th>
+                    <th className="text-left py-3 px-2">Time</th>
+                    {readingFields.length > 0
+                      ? readingFields.slice(0, 4).map((f) => (
+                          <th key={f.id} className="text-left py-3 px-2">{f.label}</th>
+                        ))
+                      : (
+                        <>
+                          <th className="text-left py-3 px-2">Head PSI</th>
+                          <th className="text-left py-3 px-2">Suction PSI</th>
+                          <th className="text-left py-3 px-2">Brine °F</th>
+                        </>
+                      )}
+                    <th className="text-left py-3 px-2">Operator</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRows.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-wolf-grey text-sm">
+                        No readings found.
+                      </td>
+                    </tr>
+                  )}
+                  {historyRows.map((row) => (
+                    <tr key={row.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td className="py-3 px-2">{row.equipment_name}</td>
+                      <td className="py-3 px-2">{row.timestamp}</td>
+                      {readingFields.length > 0
+                        ? readingFields.slice(0, 4).map((f) => {
+                            const val = row.readings[f.id]
+                            const numVal = typeof val === 'string' ? parseFloat(val) : val
+                            const outOfRange = f.min !== null && f.max !== null && typeof numVal === 'number' && !isNaN(numVal) && (numVal < f.min || numVal > f.max)
+                            return (
+                              <td key={f.id} className={clsx('py-3 px-2', outOfRange && 'text-alert-red font-medium')}>
+                                {val ?? '-'}
+                              </td>
+                            )
+                          })
+                        : Object.values(row.readings).slice(0, 3).map((val, i) => (
+                            <td key={i} className="py-3 px-2">{val ?? '-'}</td>
+                          ))
+                      }
+                      <td className="py-3 px-2">{row.operator}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

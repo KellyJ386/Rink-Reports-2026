@@ -1,25 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Icon } from '@/components/ui/Icons'
+import { useAuth } from '@/hooks/useAuth'
 import clsx from 'clsx'
-
-// Mock data - would come from API based on facility config
-const TABS = [
-  { id: '1', name: 'Front Desk', complete: true },
-  { id: '2', name: 'Zamboni Log', complete: false },
-  { id: '3', name: 'Skate Rental', complete: false },
-  { id: '4', name: 'Pro Shop', complete: true },
-  { id: '5', name: 'Concessions', complete: false },
-  { id: '6', name: 'Learn to Skate', complete: false },
-  { id: '7', name: 'Janitorial', complete: false },
-  { id: '8', name: 'Maintenance', complete: true },
-  { id: '9', name: 'Locker Rooms', complete: false },
-  { id: '10', name: 'Parking', complete: false },
-]
 
 type ChecklistType = 'OPENING' | 'CLOSING' | 'DAILY_OPS'
 
@@ -29,26 +16,93 @@ const CHECKLIST_LABELS: Record<ChecklistType, string> = {
   DAILY_OPS: 'Daily Operations',
 }
 
-// Mock checklist items
-const MOCK_ITEMS = [
-  { id: '1', text: 'Unlock main entrance doors', checked: true, checkedBy: 'John D.', timestamp: '6:02 AM' },
-  { id: '2', text: 'Turn on lobby lights and signage', checked: true, checkedBy: 'John D.', timestamp: '6:03 AM' },
-  { id: '3', text: 'Boot up POS system and verify connectivity', checked: false, checkedBy: null, timestamp: null },
-  { id: '4', text: 'Check voicemail and respond to messages', checked: false, checkedBy: null, timestamp: null },
-  { id: '5', text: 'Verify cash drawer count', checked: false, checkedBy: null, timestamp: null },
-  { id: '6', text: 'Review daily schedule and special events', checked: false, checkedBy: null, timestamp: null },
-  { id: '7', text: 'Set out wet floor signs if needed', checked: false, checkedBy: null, timestamp: null },
-  { id: '8', text: 'Turn on music/PA system', checked: false, checkedBy: null, timestamp: null },
-]
+interface Tab {
+  id: string
+  name: string
+  complete: boolean
+}
+
+interface ChecklistItem {
+  id: string
+  text: string
+  checked: boolean
+  checkedBy: string | null
+  timestamp: string | null
+}
 
 export default function DailyReportsPage() {
+  const { profile } = useAuth()
+
+  const [tabs, setTabs] = useState<Tab[]>([])
+  const [loadingTabs, setLoadingTabs] = useState(true)
   const [selectedTab, setSelectedTab] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<ChecklistType | null>(null)
-  const [items, setItems] = useState(MOCK_ITEMS)
+  const [items, setItems] = useState<ChecklistItem[]>([])
+  const [loadingItems, setLoadingItems] = useState(false)
   const [notes, setNotes] = useState('')
   const [showTypeSelector, setShowTypeSelector] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  const selectedTabData = TABS.find((t) => t.id === selectedTab)
+  const selectedTabData = tabs.find((t) => t.id === selectedTab)
+
+  // Fetch tabs on mount
+  useEffect(() => {
+    async function fetchTabs() {
+      try {
+        setLoadingTabs(true)
+        const res = await fetch('/api/daily-reports/tabs')
+        if (!res.ok) throw new Error('Failed to load tabs')
+        const data = await res.json()
+        setTabs(data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load tabs')
+      } finally {
+        setLoadingTabs(false)
+      }
+    }
+    fetchTabs()
+  }, [])
+
+  // Fetch checklist items when tab + type + date are selected
+  const fetchItems = useCallback(async (tabId: string, type: ChecklistType, date: string) => {
+    try {
+      setLoadingItems(true)
+      setError(null)
+
+      const [itemsRes, entriesRes] = await Promise.all([
+        fetch(`/api/daily-reports/checklist?tab_id=${tabId}&checklist_type=${type}`),
+        fetch(`/api/daily-reports/entries?date=${date}&tab_id=${tabId}`),
+      ])
+
+      if (!itemsRes.ok) throw new Error('Failed to load checklist items')
+      const checklistData = await itemsRes.json()
+
+      let entriesData: Record<string, { checked_by: string; timestamp: string }> = {}
+      if (entriesRes.ok) {
+        const entries = await entriesRes.json()
+        entries.forEach((entry: { item_id: string; checked_by: string; timestamp: string }) => {
+          entriesData[entry.item_id] = { checked_by: entry.checked_by, timestamp: entry.timestamp }
+        })
+      }
+
+      const merged: ChecklistItem[] = checklistData.map((item: { id: string; text: string }) => ({
+        id: item.id,
+        text: item.text,
+        checked: !!entriesData[item.id],
+        checkedBy: entriesData[item.id]?.checked_by ?? null,
+        timestamp: entriesData[item.id]?.timestamp ?? null,
+      }))
+
+      setItems(merged)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load items')
+    } finally {
+      setLoadingItems(false)
+    }
+  }, [])
 
   function handleTabClick(tabId: string) {
     setSelectedTab(tabId)
@@ -59,28 +113,79 @@ export default function DailyReportsPage() {
   function handleTypeSelect(type: ChecklistType) {
     setSelectedType(type)
     setShowTypeSelector(false)
-    // Reset items for new selection
-    setItems(MOCK_ITEMS.map((item) => ({ ...item, checked: false, checkedBy: null, timestamp: null })))
+    if (selectedTab) {
+      fetchItems(selectedTab, type, selectedDate)
+    }
   }
 
-  function handleCheck(itemId: string) {
+  async function handleCheck(itemId: string) {
+    const item = items.find((i) => i.id === itemId)
+    if (!item) return
+
+    const newChecked = !item.checked
+
+    // Optimistic update
     setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
+      prev.map((i) =>
+        i.id === itemId
           ? {
-              ...item,
-              checked: !item.checked,
-              checkedBy: item.checked ? null : 'Current User',
-              timestamp: item.checked ? null : new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+              ...i,
+              checked: newChecked,
+              checkedBy: newChecked ? (profile?.full_name ?? 'Current User') : null,
+              timestamp: newChecked ? new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null,
             }
-          : item
+          : i
       )
     )
+
+    try {
+      const res = await fetch('/api/daily-reports/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tab_id: selectedTab,
+          item_id: itemId,
+          checked: newChecked,
+          date: selectedDate,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save entry')
+    } catch (err) {
+      // Revert on error
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === itemId
+            ? { ...i, checked: !newChecked, checkedBy: item.checkedBy, timestamp: item.timestamp }
+            : i
+        )
+      )
+      setError(err instanceof Error ? err.message : 'Failed to save entry')
+    }
   }
 
   async function handleSave() {
-    // Would POST to /api/daily-reports
-    alert('Checklist saved!')
+    try {
+      setSaving(true)
+      setError(null)
+      const res = await fetch('/api/daily-reports/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tab_id: selectedTab,
+          checklist_type: selectedType,
+          date: selectedDate,
+          notes,
+          items: items.map((i) => ({ id: i.id, checked: i.checked })),
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save checklist')
+      setSuccessMsg('Checklist saved successfully!')
+      setTimeout(() => setSuccessMsg(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save checklist')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -91,12 +196,32 @@ export default function DailyReportsPage() {
         Daily Reports
       </h1>
 
+      {/* Error / Success messages */}
+      {error && (
+        <div className="mx-4 mb-4 p-3 bg-alert-red/10 text-alert-red rounded-lg text-sm">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="mx-4 mb-4 p-3 bg-action-green/10 text-action-green rounded-lg text-sm">
+          {successMsg}
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loadingTabs && (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-navy" />
+        </div>
+      )}
+
       {/* Tab Selection */}
-      {!selectedType && (
+      {!loadingTabs && !selectedType && (
         <>
           <div className="overflow-x-auto pb-2 px-4">
             <div className="flex gap-2 min-w-max">
-              {TABS.map((tab) => (
+              {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabClick(tab.id)}
@@ -155,42 +280,57 @@ export default function DailyReportsPage() {
           <div className="mb-4">
             <input
               type="date"
-              defaultValue={new Date().toISOString().split('T')[0]}
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value)
+                if (selectedTab && selectedType) {
+                  fetchItems(selectedTab, selectedType, e.target.value)
+                }
+              }}
               className="form-input max-w-xs"
             />
           </div>
 
-          {/* Checklist items */}
-          <div className="card space-y-1">
-            {items.map((item) => (
-              <Checkbox
-                key={item.id}
-                label={item.text}
-                checked={item.checked}
-                onChange={() => handleCheck(item.id)}
-                timestamp={item.timestamp || undefined}
-                checkedBy={item.checkedBy || undefined}
-              />
-            ))}
-          </div>
+          {/* Loading items */}
+          {loadingItems ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-navy" />
+            </div>
+          ) : (
+            <>
+              {/* Checklist items */}
+              <div className="card space-y-1">
+                {items.map((item) => (
+                  <Checkbox
+                    key={item.id}
+                    label={item.text}
+                    checked={item.checked}
+                    onChange={() => handleCheck(item.id)}
+                    timestamp={item.timestamp || undefined}
+                    checkedBy={item.checkedBy || undefined}
+                  />
+                ))}
+              </div>
 
-          {/* Notes */}
-          <div className="mt-4">
-            <label className="form-label">Notes (optional)</label>
-            <textarea
-              className="form-input min-h-[80px]"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any notes..."
-            />
-          </div>
+              {/* Notes */}
+              <div className="mt-4">
+                <label className="form-label">Notes (optional)</label>
+                <textarea
+                  className="form-input min-h-[80px]"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add any notes..."
+                />
+              </div>
 
-          {/* Save */}
-          <div className="mt-4">
-            <Button onClick={handleSave} size="lg" className="w-full sm:w-auto">
-              Save Checklist
-            </Button>
-          </div>
+              {/* Save */}
+              <div className="mt-4">
+                <Button onClick={handleSave} size="lg" className="w-full sm:w-auto" disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Checklist'}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

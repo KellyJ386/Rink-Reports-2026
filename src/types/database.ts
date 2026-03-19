@@ -280,6 +280,7 @@ export type Database = {
           point_number: number
           x_percent: number
           y_percent: number
+          label: string | null
         }
         Insert: {
           id?: string
@@ -287,6 +288,7 @@ export type Database = {
           point_number: number
           x_percent: number
           y_percent: number
+          label?: string | null
         }
         Update: {
           id?: string
@@ -294,6 +296,7 @@ export type Database = {
           point_number?: number
           x_percent?: number
           y_percent?: number
+          label?: string | null
         }
         Relationships: []
       }
@@ -301,28 +304,40 @@ export type Database = {
         Row: {
           id: string
           point_id: string
+          template_id: string
           facility_id: string
           user_id: string
           value: number
+          depth_inches: number
           source: DepthSource
+          recorded_by: string
+          recorded_at: string
           created_at: string
         }
         Insert: {
           id?: string
           point_id: string
+          template_id?: string
           facility_id: string
-          user_id: string
-          value: number
+          user_id?: string
+          value?: number
+          depth_inches?: number
           source?: DepthSource
+          recorded_by?: string
+          recorded_at?: string
           created_at?: string
         }
         Update: {
           id?: string
           point_id?: string
+          template_id?: string
           facility_id?: string
           user_id?: string
           value?: number
+          depth_inches?: number
           source?: DepthSource
+          recorded_by?: string
+          recorded_at?: string
           created_at?: string
         }
         Relationships: []
@@ -367,6 +382,8 @@ export type Database = {
           machine_hours: number
           ice_taken: number
           water_used: number
+          cut_number: number | null
+          water_temperature: number | null
           notes: string | null
           created_at: string
         }
@@ -376,9 +393,11 @@ export type Database = {
           user_id: string
           equipment_id: string
           rink_name: string
-          machine_hours: number
-          ice_taken: number
-          water_used: number
+          machine_hours?: number
+          ice_taken?: number
+          water_used?: number
+          cut_number?: number | null
+          water_temperature?: number | null
           notes?: string | null
           created_at?: string
         }
@@ -391,6 +410,8 @@ export type Database = {
           machine_hours?: number
           ice_taken?: number
           water_used?: number
+          cut_number?: number | null
+          water_temperature?: number | null
           notes?: string | null
           created_at?: string
         }
@@ -401,6 +422,7 @@ export type Database = {
           id: string
           facility_id: string
           user_id: string
+          equipment_id: string | null
           rink_name: string
           notes: string | null
           created_at: string
@@ -409,6 +431,7 @@ export type Database = {
           id?: string
           facility_id: string
           user_id: string
+          equipment_id?: string | null
           rink_name: string
           notes?: string | null
           created_at?: string
@@ -417,6 +440,7 @@ export type Database = {
           id?: string
           facility_id?: string
           user_id?: string
+          equipment_id?: string | null
           rink_name?: string
           notes?: string | null
           created_at?: string
@@ -429,6 +453,39 @@ export type Database = {
           facility_id: string
           user_id: string
           equipment_id: string
+          blade_type: string | null
+          reason: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          facility_id: string
+          user_id: string
+          equipment_id: string
+          blade_type?: string | null
+          reason?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          facility_id?: string
+          user_id?: string
+          equipment_id?: string
+          blade_type?: string | null
+          reason?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      circle_checks: {
+        Row: {
+          id: string
+          facility_id: string
+          user_id: string
+          equipment_id: string
           notes: string | null
           created_at: string
         }
@@ -450,33 +507,10 @@ export type Database = {
         }
         Relationships: []
       }
-      circle_checks: {
-        Row: {
-          id: string
-          facility_id: string
-          user_id: string
-          equipment_id: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          facility_id: string
-          user_id: string
-          equipment_id: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          facility_id?: string
-          user_id?: string
-          equipment_id?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
       circle_check_items: {
         Row: {
           id: string
+          facility_id: string
           equipment_id: string
           text: string
           sort_order: number
@@ -484,6 +518,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          facility_id: string
           equipment_id: string
           text: string
           sort_order?: number
@@ -491,6 +526,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          facility_id?: string
           equipment_id?: string
           text?: string
           sort_order?: number
@@ -556,6 +592,7 @@ export type Database = {
         Row: {
           id: string
           facility_id: string
+          user_id: string | null
           position_id: string
           assigned_to: string | null
           date: string
@@ -563,23 +600,27 @@ export type Database = {
           end_time: string
           is_open: boolean
           notes: string | null
+          created_by: string | null
           created_at: string
         }
         Insert: {
           id?: string
           facility_id: string
-          position_id: string
+          user_id?: string | null
+          position_id?: string
           assigned_to?: string | null
-          date: string
+          date?: string
           start_time: string
           end_time: string
           is_open?: boolean
           notes?: string | null
+          created_by?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           facility_id?: string
+          user_id?: string | null
           position_id?: string
           assigned_to?: string | null
           date?: string
@@ -587,6 +628,7 @@ export type Database = {
           end_time?: string
           is_open?: boolean
           notes?: string | null
+          created_by?: string | null
           created_at?: string
         }
         Relationships: []
@@ -601,18 +643,22 @@ export type Database = {
           end_time: string
           recurring: boolean
           day_of_week: number | null
+          is_available: boolean
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
           facility_id: string
-          date: string
+          date?: string
           start_time: string
           end_time: string
           recurring?: boolean
           day_of_week?: number | null
+          is_available?: boolean
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -623,7 +669,9 @@ export type Database = {
           end_time?: string
           recurring?: boolean
           day_of_week?: number | null
+          is_available?: boolean
           created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -669,29 +717,57 @@ export type Database = {
           facility_id: string
           user_id: string
           type: IncidentType
+          title: string | null
+          date: string | null
+          time: string | null
           date_time: string
           location: string
           description: string
           injured_name: string | null
           injured_type: InjuredType | null
           body_diagram_data: Json | null
+          body_regions: string[] | null
+          severity: string | null
+          first_aid_given: boolean | null
+          equipment_involved: string | null
+          damage_description: string | null
+          estimated_cost: number | null
+          actions_taken: string | null
           witnesses: string | null
           category: string | null
+          reported_by: string
+          reported_at: string
+          updated_by: string | null
+          updated_at: string | null
           created_at: string
         }
         Insert: {
           id?: string
           facility_id: string
-          user_id: string
+          user_id?: string
           type: IncidentType
-          date_time: string
-          location: string
+          title?: string | null
+          date?: string | null
+          time?: string | null
+          date_time?: string
+          location?: string
           description: string
           injured_name?: string | null
           injured_type?: InjuredType | null
           body_diagram_data?: Json | null
+          body_regions?: string[] | null
+          severity?: string | null
+          first_aid_given?: boolean | null
+          equipment_involved?: string | null
+          damage_description?: string | null
+          estimated_cost?: number | null
+          actions_taken?: string | null
           witnesses?: string | null
           category?: string | null
+          reported_by: string
+          reported_at?: string
+          updated_by?: string | null
+          updated_at?: string | null
           created_at?: string
         }
         Update: {
@@ -699,14 +775,28 @@ export type Database = {
           facility_id?: string
           user_id?: string
           type?: IncidentType
+          title?: string | null
+          date?: string | null
+          time?: string | null
           date_time?: string
           location?: string
           description?: string
           injured_name?: string | null
           injured_type?: InjuredType | null
           body_diagram_data?: Json | null
+          body_regions?: string[] | null
+          severity?: string | null
+          first_aid_given?: boolean | null
+          equipment_involved?: string | null
+          damage_description?: string | null
+          estimated_cost?: number | null
+          actions_taken?: string | null
           witnesses?: string | null
           category?: string | null
+          reported_by?: string
+          reported_at?: string
+          updated_by?: string | null
+          updated_at?: string | null
           created_at?: string
         }
         Relationships: []
@@ -746,6 +836,8 @@ export type Database = {
           unit: string
           min_threshold: number | null
           max_threshold: number | null
+          min_value: number | null
+          max_value: number | null
         }
         Insert: {
           id?: string
@@ -754,6 +846,8 @@ export type Database = {
           unit: string
           min_threshold?: number | null
           max_threshold?: number | null
+          min_value?: number | null
+          max_value?: number | null
         }
         Update: {
           id?: string
@@ -762,6 +856,8 @@ export type Database = {
           unit?: string
           min_threshold?: number | null
           max_threshold?: number | null
+          min_value?: number | null
+          max_value?: number | null
         }
         Relationships: []
       }
@@ -771,13 +867,19 @@ export type Database = {
           equipment_id: string
           facility_id: string
           user_id: string
+          notes: string | null
+          recorded_by: string
+          recorded_at: string
           created_at: string
         }
         Insert: {
           id?: string
           equipment_id: string
           facility_id: string
-          user_id: string
+          user_id?: string
+          notes?: string | null
+          recorded_by?: string
+          recorded_at?: string
           created_at?: string
         }
         Update: {
@@ -785,6 +887,9 @@ export type Database = {
           equipment_id?: string
           facility_id?: string
           user_id?: string
+          notes?: string | null
+          recorded_by?: string
+          recorded_at?: string
           created_at?: string
         }
         Relationships: []
@@ -796,6 +901,7 @@ export type Database = {
           reading_type_id: string
           value: number
           out_of_range: boolean
+          recorded_by: string
         }
         Insert: {
           id?: string
@@ -803,6 +909,7 @@ export type Database = {
           reading_type_id: string
           value: number
           out_of_range?: boolean
+          recorded_by?: string
         }
         Update: {
           id?: string
@@ -810,6 +917,7 @@ export type Database = {
           reading_type_id?: string
           value?: number
           out_of_range?: boolean
+          recorded_by?: string
         }
         Relationships: []
       }
@@ -915,6 +1023,84 @@ export type Database = {
           state_code?: string
           name?: string
           metrics?: Json
+        }
+        Relationships: []
+      }
+      notification_settings: {
+        Row: {
+          id: string
+          facility_id: string
+          event_type: string
+          channel: string
+          recipients: string[] | null
+          recipient_roles: string[] | null
+          is_enabled: boolean
+          settings: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          facility_id: string
+          event_type: string
+          channel: string
+          recipients?: string[] | null
+          recipient_roles?: string[] | null
+          is_enabled?: boolean
+          settings?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          facility_id?: string
+          event_type?: string
+          channel?: string
+          recipients?: string[] | null
+          recipient_roles?: string[] | null
+          is_enabled?: boolean
+          settings?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      swap_requests: {
+        Row: {
+          id: string
+          facility_id: string
+          shift_id: string
+          requested_by: string
+          requested_to: string | null
+          reason: string | null
+          status: SwapStatus
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          facility_id: string
+          shift_id: string
+          requested_by: string
+          requested_to?: string | null
+          reason?: string | null
+          status?: SwapStatus
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          facility_id?: string
+          shift_id?: string
+          requested_by?: string
+          requested_to?: string | null
+          reason?: string | null
+          status?: SwapStatus
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
         }
         Relationships: []
       }
