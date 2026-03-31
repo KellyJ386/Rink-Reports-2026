@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+const markReadSchema = z.object({
+  notification_ids: z.array(z.string().uuid()).min(1, 'At least one notification ID is required'),
+})
 
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient()
@@ -40,11 +45,15 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { notification_ids } = body as { notification_ids: string[] }
-
-  if (!notification_ids || !Array.isArray(notification_ids) || notification_ids.length === 0) {
-    return NextResponse.json({ error: 'notification_ids array is required' }, { status: 400 })
+  const parsed = markReadSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
   }
+
+  const { notification_ids } = parsed.data
 
   const { error } = await supabase
     .from('notifications')

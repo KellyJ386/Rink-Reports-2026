@@ -1,5 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+const generateReportSchema = z.object({
+  module: z.enum([
+    'daily-reports',
+    'ice-depth',
+    'ice-operations',
+    'incidents',
+    'refrigeration',
+    'air-quality',
+    'scheduling',
+  ]),
+  type: z.enum(['pdf', 'excel', 'csv']),
+  filters: z.object({
+    start_date: z.string().optional(),
+    end_date: z.string().optional(),
+  }).passthrough().optional(),
+})
 
 const MODULE_TABLES: Record<string, string> = {
   'daily-reports': 'daily_reports',
@@ -30,23 +48,15 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { module, type, filters } = body as {
-    module: string
-    type: 'pdf' | 'excel' | 'csv'
-    filters?: {
-      start_date?: string
-      end_date?: string
-      [key: string]: unknown
-    }
+  const parsed = generateReportSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
   }
 
-  if (!module || !type) {
-    return NextResponse.json({ error: 'module and type are required' }, { status: 400 })
-  }
-
-  if (!['pdf', 'excel', 'csv'].includes(type)) {
-    return NextResponse.json({ error: 'type must be pdf, excel, or csv' }, { status: 400 })
-  }
+  const { module, type, filters } = parsed.data
 
   const tableName = MODULE_TABLES[module]
   if (!tableName) {

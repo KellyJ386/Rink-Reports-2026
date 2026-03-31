@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { syncSignupToHubSpot } from '@/lib/hubspot'
+
+const onboardingFacilitySchema = z.object({
+  facility_name: z.string().min(1, 'Facility name is required').max(255),
+  address: z.string().max(500).optional().default(''),
+  city: z.string().max(100).optional().default(''),
+  state: z.string().max(50).optional().default(''),
+  zip: z.string().max(20).optional().default(''),
+  phone: z.string().max(30).optional().default(''),
+  admin_full_name: z.string().min(1, 'Admin name is required').max(200),
+})
 
 export async function POST(request: Request) {
   try {
@@ -20,14 +31,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { facility_name, address, city, state, zip, phone, admin_full_name } = body
-
-    if (!facility_name || !admin_full_name) {
+    const parsed = onboardingFacilitySchema.safeParse(body)
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Facility name and admin name are required' },
+        { error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400 }
       )
     }
+
+    const { facility_name, address, city, state, zip, phone, admin_full_name } = parsed.data
 
     // Create facility record
     const { data: facility, error: facilityError } = await supabase
