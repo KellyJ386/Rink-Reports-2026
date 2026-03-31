@@ -50,6 +50,7 @@ export type Database = {
           data_retention_years: number
           incident_retention_years: number
           is_archived: boolean
+          operating_hours: Json | null
           created_at: string
           updated_at: string
         }
@@ -69,6 +70,7 @@ export type Database = {
           data_retention_years?: number
           incident_retention_years?: number
           is_archived?: boolean
+          operating_hours?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -88,6 +90,7 @@ export type Database = {
           data_retention_years?: number
           incident_retention_years?: number
           is_archived?: boolean
+          operating_hours?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -961,6 +964,8 @@ export type Database = {
           user_id: string
           location: string
           notes: string | null
+          has_exceedance: boolean
+          recorded_at: string
           created_at: string
         }
         Insert: {
@@ -969,6 +974,8 @@ export type Database = {
           user_id: string
           location: string
           notes?: string | null
+          has_exceedance?: boolean
+          recorded_at?: string
           created_at?: string
         }
         Update: {
@@ -977,6 +984,8 @@ export type Database = {
           user_id?: string
           location?: string
           notes?: string | null
+          has_exceedance?: boolean
+          recorded_at?: string
           created_at?: string
         }
         Relationships: []
@@ -1137,6 +1146,81 @@ export type Database = {
           read?: boolean
           data?: Json | null
           created_at?: string
+        }
+        Relationships: []
+      }
+      refrigeration_alerts: {
+        Row: {
+          id: string
+          facility_id: string
+          equipment_id: string
+          reading_id: string
+          reading_type_id: string
+          value: number
+          threshold_type: string
+          threshold_value: number
+          resolved: boolean
+          resolved_by: string | null
+          resolved_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          facility_id: string
+          equipment_id: string
+          reading_id: string
+          reading_type_id: string
+          value: number
+          threshold_type: string
+          threshold_value: number
+          resolved?: boolean
+          resolved_by?: string | null
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          facility_id?: string
+          equipment_id?: string
+          reading_id?: string
+          reading_type_id?: string
+          value?: number
+          threshold_type?: string
+          threshold_value?: number
+          resolved?: boolean
+          resolved_by?: string | null
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      air_quality_jurisdiction_thresholds: {
+        Row: {
+          id: string
+          jurisdiction_id: string
+          metric_id: string
+          warning_min: number | null
+          warning_max: number | null
+          critical_min: number | null
+          critical_max: number | null
+        }
+        Insert: {
+          id?: string
+          jurisdiction_id: string
+          metric_id: string
+          warning_min?: number | null
+          warning_max?: number | null
+          critical_min?: number | null
+          critical_max?: number | null
+        }
+        Update: {
+          id?: string
+          jurisdiction_id?: string
+          metric_id?: string
+          warning_min?: number | null
+          warning_max?: number | null
+          critical_min?: number | null
+          critical_max?: number | null
         }
         Relationships: []
       }

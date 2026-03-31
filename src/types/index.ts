@@ -45,6 +45,8 @@ export type AirQualityReading = Database['public']['Tables']['air_quality_readin
 export type AirQualityReadingValue = Database['public']['Tables']['air_quality_reading_values']['Row']
 export type AirQualityJurisdiction = Database['public']['Tables']['air_quality_jurisdictions']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
+export type RefrigerationAlert = Database['public']['Tables']['refrigeration_alerts']['Row']
+export type AirQualityJurisdictionThreshold = Database['public']['Tables']['air_quality_jurisdiction_thresholds']['Row']
 
 // Module identifiers
 export type ModuleId =
