@@ -52,6 +52,7 @@ CREATE TABLE profiles (
   position TEXT,
   certifications TEXT[],
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  last_active_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

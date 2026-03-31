@@ -106,6 +106,7 @@ export type Database = {
           position: string | null
           certifications: string[] | null
           is_active: boolean
+          last_active_at: string | null
           created_at: string
           updated_at: string
         }
@@ -118,6 +119,7 @@ export type Database = {
           position?: string | null
           certifications?: string[] | null
           is_active?: boolean
+          last_active_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -130,6 +132,7 @@ export type Database = {
           position?: string | null
           certifications?: string[] | null
           is_active?: boolean
+          last_active_at?: string | null
           created_at?: string
           updated_at?: string
         }

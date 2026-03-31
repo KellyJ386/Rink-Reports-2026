@@ -101,6 +101,35 @@ export async function POST(request: Request) {
       break
     }
 
+    case 'customer.subscription.updated': {
+      const subscription = event.data.object as Stripe.Subscription
+      const customerId = subscription.customer as string
+
+      // Map Stripe status to our internal status
+      const statusMap: Record<string, string> = {
+        active: 'active',
+        trialing: 'trialing',
+        past_due: 'past_due',
+        canceled: 'cancelled',
+        unpaid: 'past_due',
+        incomplete: 'pending',
+        incomplete_expired: 'cancelled',
+        paused: 'cancelled',
+      }
+
+      const mappedStatus = statusMap[subscription.status] ?? subscription.status
+
+      const { error } = await supabase
+        .from('facilities')
+        .update({ subscription_status: mappedStatus })
+        .eq('stripe_customer_id', customerId)
+
+      if (error) {
+        console.error('Failed to update facility on subscription update:', error.message)
+      }
+      break
+    }
+
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice
       const customerId = invoice.customer as string
